@@ -91,3 +91,8 @@ ENV/
 
 # Temporary files
 *~
+.*
+
+# Data files
+*.csv
+*.wav
