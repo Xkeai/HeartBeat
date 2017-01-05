@@ -1,7 +1,7 @@
-import numpy as np
-import scikits.audiolab as au
+from scipy.io import wavfile
 
 import csv
+import numpy as np
 
 
 # A utility class to manage the data from the set_a_timing.csv file
@@ -44,8 +44,8 @@ class timing_dataset:
         # np.array have to be the same size
         max_length = 0
         for fname in data_list:
-            w = au.wavread(fname)
-            length = w[0].shape[0]
+            fs, w = wavfile.read(fname)
+            length = w.shape[0]
             if(max_length < length):
                 max_length = length
         self.max_length = max_length
@@ -63,9 +63,9 @@ class timing_dataset:
     # The second is the label. Its shape is max_lengthx2.
     # The first col is for S1. The second is for S2.
     def import_data(self, fname, label_l):
-        sound, _, _ = au.wavread(fname)
+        fs, sound = wavfile.read(fname)
 
-        data = np.zeros((1, self.max_length, 1))
+        data = np.zeros((1, self.max_length, 1), dtype=np.float64)
         data[0, 0:sound.shape[0], 0] = sound
 
         label = np.zeros((self.max_length, 2))
