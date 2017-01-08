@@ -63,6 +63,7 @@ class timing_dataset:
     # The second is the label. Its shape is max_lengthx2.
     # The first col is for S1. The second is for S2.
     def import_data(self, fname, label_l):
+        print "Importing %s" % (fname)
         fs, sound = wavfile.read(fname)
 
         data = np.zeros((1, self.max_length, 1), dtype=np.float64)
