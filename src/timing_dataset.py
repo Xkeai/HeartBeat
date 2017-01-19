@@ -76,13 +76,13 @@ class timing_dataset:
             else:
                 i = 1
             label[l[1], i] = 1
-        return data, label
+        return data, label, 1
 
     # This function returns the data from the training set one by one.
     def next_train(self):
         index = self.index_train
         self.index_train += 1
-        if self.index_train > self.no_train:
+        if self.index_train >= self.no_train:
             self.epochs += 1
             self.index_train = 0
         fname = self.data_train[index]
@@ -94,7 +94,7 @@ class timing_dataset:
         self.index_valid += 1
         if self.index_valid > self.no_valid:
             self.index_valid = 0
-            return -1, -1
+            return -1, -1, -1
         fname = self.data_valid[index]
         label_l = self.label_valid[index]
         return self.import_data(fname, label_l)

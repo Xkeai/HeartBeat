@@ -1,0 +1,15 @@
+Epoch 0 Batch 10 train_loss nan valid_loss nan 
+Epoch 0 Batch 0 train_loss nan valid_loss nan 
+Epoch 0 Batch 0 train_loss 187.415235672 valid_loss 137.329568858 
+Epoch 0 Batch 10 train_loss 234.315410037 valid_loss 135.184959312 
+Epoch 0 Batch 0 train_loss 206.915845466 valid_loss 132.143753437 
+Epoch 0 Batch 10 train_loss 253.803687797 valid_loss 121.332616984 
+Epoch 1 Batch 20 train_loss 159.465381916 valid_loss 118.353165204 
+Epoch 1 Batch 30 train_loss 174.272841233 valid_loss 116.242331888 
+Epoch 2 Batch 40 train_loss 80.1952507991 valid_loss 114.509530941 
+Epoch 3 Batch 50 train_loss 79.9165635076 valid_loss 113.126255539 
+Epoch 3 Batch 60 train_loss 63.1193968638 valid_loss 111.945128124 
+Epoch 4 Batch 70 train_loss 163.869918624 valid_loss 110.882212081 
+Epoch 4 Batch 80 train_loss 78.756964311 valid_loss 109.957397517 
+Epoch 5 Batch 90 train_loss 60.0222858787 valid_loss 109.100821518 
+Epoch 5 Batch 100 train_loss 107.35880704 valid_loss 108.323945004 

@@ -11,21 +11,22 @@ from timing_dataset import timing_dataset
 
 dataset = timing_dataset('../data/set_a_timing.csv')
 
-
 # Parameters of the loop
 LOG_STEP = 10
-SAVER_STEP = 100
+SAVER_STEP = 10
 
 # Inputs for the network
 x = tf.placeholder(tf.float64, [1, dataset.max_length, 1])
 
 y_ = tf.placeholder(tf.float64, [dataset.max_length, 2])
 
+X = tf.reshape(x, [100, dataset.max_length / 100, 1])
+
 # Defining the LSTM cell
 num_hidden = 15
 cell = tf.nn.rnn_cell.LSTMCell(num_hidden, state_is_tuple=True)
 
-val, state = tf.nn.dynamic_rnn(cell, x, dtype=tf.float64)
+val, state = tf.nn.dynamic_rnn(cell, X, dtype=tf.float64)
 
 val = tf.reshape(val, [dataset.max_length, 15])
 
@@ -34,8 +35,7 @@ y = cf.fc_nn(val, [num_hidden, 2])
 
 # Our loss/energy function is the cross-entropy between the label and the
 # output
-loss = tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(y), reduction_indices=[1]))
-
+loss = -tf.reduce_sum(y_ * tf.log(tf.clip_by_value(y, 1e-10, 1.0)))
 # We are using the Adam Optimiser because it is effective at managing the
 # learning rate and momentum
 train_step = tf.train.AdamOptimizer(1e-3).minimize(loss)
@@ -49,14 +49,15 @@ saver = tf.train.Saver()
 checkpoint = 0
 
 with sess.as_default():
-    for s in range(1, int(2e6)):
-        data, label = dataset.next_train()
+    for s in range(int(2e6)):
+        data, label, _ = dataset.next_train()
         print 'step {}'.format(s)
 
         # We update the log with the newest performance results
         if (s % LOG_STEP == 0):
             # We calculate the performance results
             # for the training set on the current batch
+
             train_loss = loss.eval(feed_dict={x: data, y_: label})
 
             # For the validation set, we do it on the whole thing
@@ -64,8 +65,8 @@ with sess.as_default():
             valid_loss = 0
             batch_count = 0.0
             while True:
-                vd, vl = dataset.next_valid()
-                if vd == -1:
+                vd, vl, end = dataset.next_valid()
+                if end == -1:
                     break
                 batch_count += 1.0
                 valid_loss += loss.eval(feed_dict={x: vd, y_: vl})
@@ -74,7 +75,7 @@ with sess.as_default():
             # Adding a new line to the log
             logline = 'Epoch {} Batch {} train_loss {} valid_loss {} \n'
             logline = logline.format(
-                dataset.completed_epochs, s, train_loss, valid_loss)
+                dataset.epochs, s, train_loss, valid_loss)
             log.write(logline)
             print logline
 

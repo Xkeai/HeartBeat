@@ -1,0 +1,6 @@
+model_checkpoint_path: "rnn__-10"
+all_model_checkpoint_paths: "rnn__-6"
+all_model_checkpoint_paths: "rnn__-7"
+all_model_checkpoint_paths: "rnn__-8"
+all_model_checkpoint_paths: "rnn__-9"
+all_model_checkpoint_paths: "rnn__-10"
