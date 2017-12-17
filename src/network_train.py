@@ -49,7 +49,7 @@ outputs, states = tf.nn.dynamic_rnn(lstm_cell, x, dtype=tf.float16)
 # The output is of shape [batch_size, max_length, num_hidden]
 # We need [batch_size, max_length, 2] so we do matrix mutiplication
 # The shape of matrix is [num_hidden, 2]
-weight = tf.random_normal([num_hidden, 2], dtype=tf.float16)
+weight = tf.random_normal([1, num_hidden, 2], dtype=tf.float16)
 y = tf.matmul(outputs, weight)
 
 netOutput = tf.nn.softmax(y)
