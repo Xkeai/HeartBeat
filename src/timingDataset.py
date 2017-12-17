@@ -146,6 +146,7 @@ class timingDataset:
         np.random.shuffle(self.perm)
 
     def next_batch_train(self, batch_size=1):
+        # Figuring out the data to send
         start = self.index_train
         self.index_train += batch_size
         if self.index_train > self.no_train:
@@ -158,6 +159,7 @@ class timingDataset:
 
         end = self.index_train
         cur_perm = self.perm[start:end]
+        # Loading and returning the data
         data = np.zeros([batch_size, self.max_length, 1])
         label = np.zeros([batch_size, self.max_length, 2])
         for i in range(batch_size):
@@ -174,15 +176,18 @@ class timingDataset:
         if self.index_valid > self.no_valid:
             # Unlike train, we want the called of this function to know that
             # they are done with the set
-            # Hence why we send -1,-1
+            # Hence why we send -1,-1, -1
             self.index_valid = 0
-            return -1, -1
+            return -1, -1, -1
+
         end = self.index_valid
         # Loading the data and returning it
         data = np.zeros([batch_size, self.max_length, 1])
         label = np.zeros([batch_size, self.max_length, 2])
-        for i in range(start, end):
-            data[i, :, :] = getSoundData(self.keys_valid[i], self.max_length)
-            label[i, :, :] = createLabel(self.timingInfo[self.keys_valid[i]],
+        ord = range(start, end)
+        for i in range(batch_size):
+            o = ord[i]
+            data[i, :, :] = getSoundData(self.keys_valid[o], self.max_length)
+            label[i, :, :] = createLabel(self.timingInfo[self.keys_valid[o]],
                                          self.max_length)
-        return data, label
+        return data, label, 1

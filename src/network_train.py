@@ -91,8 +91,10 @@ with tf.Session() as sess:
                 feed_dict={x: train_data, y_: train_label})
             valid_loss = 0
             no_valid = 0
-            valid_data, valid_label = dataset.next_batch_valid(1)
-            while valid_data != -1:
+            while True:
+                valid_data, valid_label, ended = dataset.next_batch_valid(1)
+                if ended == -1:
+                    break
                 valid_loss += sess.run(
                     loss,
                     feed_dict={x: valid_data, y_: valid_label})
