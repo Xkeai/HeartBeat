@@ -99,7 +99,7 @@ with tf.Session() as sess:
                     loss,
                     feed_dict={x: valid_data, y_: valid_label})
                 no_valid += 1
-                valid_data, valid_label = dataset.next_batch_valid(1)
+
             log_entry["valid_loss"] = valid_loss / no_valid
             log.addEntry(log_entry)
             print(log_entry)
