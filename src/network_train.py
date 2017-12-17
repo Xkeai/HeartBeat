@@ -59,7 +59,7 @@ loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
 # I am using Adam as it has built-in learning rate reduction.
 # The moments also help speed up the learning.
 # Plus I am lazy.
-optimizer = tf.train.AdamOptimiser(learning_rate=learning_rate)
+optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 train_op = optimizer.minimize(loss)
 
 
