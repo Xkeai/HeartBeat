@@ -32,9 +32,9 @@ batch_size = 1
 # Defining the input
 
 # The data
-x = tf.placeholder(tf.float16, [None, dataset.max_length, 1])
+x = tf.placeholder(tf.float16, [batch_size, dataset.max_length, 1])
 # The label/target
-y_ = tf.placeholder(tf.float16, [None, dataset.max_length, 2])
+y_ = tf.placeholder(tf.float16, [batch_size, dataset.max_length, 2])
 
 
 # Defining the LSTM cell and the dynamic RNN
@@ -53,9 +53,12 @@ weight = tf.random_normal([1, num_hidden, 2], dtype=tf.float16)
 y = tf.matmul(outputs, weight)
 
 netOutput = tf.nn.softmax(y)
-
+# A tiny amount is added to y to keep it from producing a NaN
+# 0*log(0) = NaN
+# However, this introduces a bit of bias.
+# But it is small enough to be acceptable
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-    logits=y, labels=y_))
+    logits=y + 1e-10, labels=y_))
 # I am using Adam as it has built-in learning rate reduction.
 # The moments also help speed up the learning.
 # Plus I am lazy.
