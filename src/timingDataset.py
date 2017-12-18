@@ -11,6 +11,8 @@ import numpy as np
 import wave
 import struct
 
+from math import isnan
+
 
 def getTimingInfo(FNAME, fnamePrefix=''):
     """ getTimingInfo:
@@ -82,6 +84,7 @@ def getSoundData(FNAME, max_length):
     samples = importWavFile(FNAME)
     for i in range(len(samples)):
         ret[0, i, 0] = samples[i]
+
     return ret
 
 
@@ -105,6 +108,38 @@ def createLabel(locationsByType, max_length):
     return label
 
 
+def testSoundFiles(filenames, max_length):
+    """ testSoundFiles
+    Imports the sounds files and runs a few test on them.
+    Input:
+    filenames: A list of strings
+    Output:
+    True if all test ae successful, False if not
+    Side-effect:
+    If there is a problem, prints out a text explaining the problem.
+    """
+    noProblem = True
+
+    is_nan_vec = np.vectorize(isnan)
+    is_None_vec = np.vectorize(lambda x: x is None)
+
+    for fname in filenames:
+        data = getSoundData(fname, max_length)
+        if(data is None):
+            print("problem importing:" + fname)
+            noProblem = False
+            break
+        if(is_nan_vec(data).any()):
+            print("Invalid data 'nan' in:" + fname)
+            noProblem = False
+        if(is_None_vec(data).any()):
+            print("Invalid data 'None' in:" + fname)
+            noProblem = False
+    if(noProblem):
+        print('There are no problems in recordings')
+    return noProblem
+
+
 class timingDataset:
 
     def __init__(self, FNAME, fnamePrefix='../data/'):
@@ -112,7 +147,7 @@ class timingDataset:
         self.timingInfo = getTimingInfo(FNAME, fnamePrefix=fnamePrefix)
         # Counting the data points
         self.dataset_size = len(self.timingInfo)
-        # And dividing them into train and valid set (with a ration of 80/20)
+        # And dividing them into train and valid set (with a ration of 80/20
         self.no_train = int(self.dataset_size * 0.8)
         self.no_valid = self.dataset_size - self.no_train
         # I am going to import data as it is needed.
@@ -122,19 +157,22 @@ class timingDataset:
         self.keys_valid = self.timingInfo.keys()[self.no_train:]
         # We need to have the max_length for we construct the tensors
         self.max_length = findMaxLength(self.timingInfo.keys())
+        # Testing the soundFiles
+        if(not testSoundFiles(self.timingInfo.keys(), self.max_length):
+           raise ValueError("Invalid values for the recordings")
         # Lastly, we have some variables for following progress of training
-        self.index_train = 0
-        self.index_valid = 0
-        self.epochs = 0
+        self.index_train=0
+        self.index_valid=0
+        self.epochs=0
         self.get_new_permutation()
 
     def reset(self):
         """
         Reseting the dataset
         """
-        self.index_train = 0
-        self.index_valid = 0
-        self.epochs = 0
+        self.index_train=0
+        self.index_valid=0
+        self.epochs=0
 
     def get_new_permutation(self):
         """
@@ -142,52 +180,52 @@ class timingDataset:
         So each time an epoch is completed the other,
         we go through is reshuffled
         """
-        self.perm = np.arange(self.no_train)
+        self.perm=np.arange(self.no_train)
         np.random.shuffle(self.perm)
 
     def next_batch_train(self, batch_size=1):
         # Figuring out the data to send
-        start = self.index_train
+        start=self.index_train
         self.index_train += batch_size
         if self.index_train > self.no_train:
             # Completed an epoch
             self.epochs += 1
             # Reshuffle the order and restart
             self.get_new_permutation()
-            start = 0
-            self.index_train = batch_size
+            start=0
+            self.index_train=batch_size
 
-        end = self.index_train
-        cur_perm = self.perm[start:end]
+        end=self.index_train
+        cur_perm=self.perm[start:end]
         # Loading and returning the data
-        data = np.zeros([batch_size, self.max_length, 1])
-        label = np.zeros([batch_size, self.max_length, 2])
+        data=np.zeros([batch_size, self.max_length, 1])
+        label=np.zeros([batch_size, self.max_length, 2])
         for i in range(batch_size):
-            p = cur_perm[i]
-            data[i, :, :] = getSoundData(self.keys_train[p], self.max_length)
-            label[i, :, :] = createLabel(self.timingInfo[self.keys_train[p]],
+            p=cur_perm[i]
+            data[i, :, :]=getSoundData(self.keys_train[p], self.max_length)
+            label[i, :, :]=createLabel(self.timingInfo[self.keys_train[p]],
                                          self.max_length)
         return data, label
 
     def next_batch_valid(self, batch_size=1):
         # Figuring out which data to send
-        start = self.index_valid
+        start=self.index_valid
         self.index_valid += batch_size
         if self.index_valid > self.no_valid:
             # Unlike train, we want the called of this function to know that
             # they are done with the set
             # Hence why we send -1,-1, -1
-            self.index_valid = 0
+            self.index_valid=0
             return -1, -1, -1
 
-        end = self.index_valid
+        end=self.index_valid
         # Loading the data and returning it
-        data = np.zeros([batch_size, self.max_length, 1])
-        label = np.zeros([batch_size, self.max_length, 2])
-        ord = range(start, end)
+        data=np.zeros([batch_size, self.max_length, 1])
+        label=np.zeros([batch_size, self.max_length, 2])
+        ord=range(start, end)
         for i in range(batch_size):
-            o = ord[i]
-            data[i, :, :] = getSoundData(self.keys_valid[o], self.max_length)
-            label[i, :, :] = createLabel(self.timingInfo[self.keys_valid[o]],
+            o=ord[i]
+            data[i, :, :]=getSoundData(self.keys_valid[o], self.max_length)
+            label[i, :, :]=createLabel(self.timingInfo[self.keys_valid[o]],
                                          self.max_length)
         return data, label, 1
