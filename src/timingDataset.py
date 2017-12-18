@@ -158,21 +158,21 @@ class timingDataset:
         # We need to have the max_length for we construct the tensors
         self.max_length = findMaxLength(self.timingInfo.keys())
         # Testing the soundFiles
-        if(not testSoundFiles(self.timingInfo.keys(), self.max_length):
-           raise ValueError("Invalid values for the recordings")
+        if(not testSoundFiles(self.timingInfo.keys(), self.max_length)):
+            raise ValueError("Invalid values for the recordings")
         # Lastly, we have some variables for following progress of training
-        self.index_train=0
-        self.index_valid=0
-        self.epochs=0
+        self.index_train = 0
+        self.index_valid = 0
+        self.epochs = 0
         self.get_new_permutation()
 
     def reset(self):
         """
         Reseting the dataset
         """
-        self.index_train=0
-        self.index_valid=0
-        self.epochs=0
+        self.index_train = 0
+        self.index_valid = 0
+        self.epochs = 0
 
     def get_new_permutation(self):
         """
@@ -180,52 +180,52 @@ class timingDataset:
         So each time an epoch is completed the other,
         we go through is reshuffled
         """
-        self.perm=np.arange(self.no_train)
+        self.perm = np.arange(self.no_train)
         np.random.shuffle(self.perm)
 
     def next_batch_train(self, batch_size=1):
         # Figuring out the data to send
-        start=self.index_train
+        start = self.index_train
         self.index_train += batch_size
         if self.index_train > self.no_train:
             # Completed an epoch
             self.epochs += 1
             # Reshuffle the order and restart
             self.get_new_permutation()
-            start=0
-            self.index_train=batch_size
+            start = 0
+            self.index_train = batch_size
 
-        end=self.index_train
-        cur_perm=self.perm[start:end]
+        end = self.index_train
+        cur_perm = self.perm[start:end]
         # Loading and returning the data
-        data=np.zeros([batch_size, self.max_length, 1])
-        label=np.zeros([batch_size, self.max_length, 2])
+        data = np.zeros([batch_size, self.max_length, 1])
+        label = np.zeros([batch_size, self.max_length, 2])
         for i in range(batch_size):
-            p=cur_perm[i]
-            data[i, :, :]=getSoundData(self.keys_train[p], self.max_length)
-            label[i, :, :]=createLabel(self.timingInfo[self.keys_train[p]],
+            p = cur_perm[i]
+            data[i, :, :] = getSoundData(self.keys_train[p], self.max_length)
+            label[i, :, :] = createLabel(self.timingInfo[self.keys_train[p]],
                                          self.max_length)
         return data, label
 
     def next_batch_valid(self, batch_size=1):
         # Figuring out which data to send
-        start=self.index_valid
+        start = self.index_valid
         self.index_valid += batch_size
         if self.index_valid > self.no_valid:
             # Unlike train, we want the called of this function to know that
             # they are done with the set
             # Hence why we send -1,-1, -1
-            self.index_valid=0
+            self.index_valid = 0
             return -1, -1, -1
 
-        end=self.index_valid
+        end = self.index_valid
         # Loading the data and returning it
-        data=np.zeros([batch_size, self.max_length, 1])
-        label=np.zeros([batch_size, self.max_length, 2])
-        ord=range(start, end)
+        data = np.zeros([batch_size, self.max_length, 1])
+        label = np.zeros([batch_size, self.max_length, 2])
+        ord = range(start, end)
         for i in range(batch_size):
-            o=ord[i]
-            data[i, :, :]=getSoundData(self.keys_valid[o], self.max_length)
-            label[i, :, :]=createLabel(self.timingInfo[self.keys_valid[o]],
+            o = ord[i]
+            data[i, :, :] = getSoundData(self.keys_valid[o], self.max_length)
+            label[i, :, :] = createLabel(self.timingInfo[self.keys_valid[o]],
                                          self.max_length)
         return data, label, 1
