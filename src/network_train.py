@@ -4,10 +4,14 @@
 # https://github.com/aymericdamien/TensorFlow-Examples/blob/master/examples/3_NeuralNetworks/recurrent_network.py
 
 import tensorflow as tf
+import numpy as np
+
 import logger
 
 from timingDataset import timingDataset
 from tensorflow.contrib import rnn
+
+import math
 
 # Creating the dataset
 dataset = timingDataset("../data/set_a_timing.csv")
@@ -21,7 +25,7 @@ log = logger.LogWriter(logFname, fields)
 # and the learning process
 
 num_hidden = 16
-learning_rate = 0.001
+learning_rate = 10**-6
 
 LOG_STEP = 10
 SAVER_STEP = 10
@@ -32,10 +36,9 @@ batch_size = 1
 # Defining the input
 
 # The data
-x = tf.placeholder(tf.float16, [batch_size, dataset.max_length, 1])
+x = tf.placeholder(tf.float32, [batch_size, dataset.max_length, 1])
 # The label/target
-y_ = tf.placeholder(tf.float16, [batch_size, dataset.max_length, 2])
-
+y_ = tf.placeholder(tf.float32, [batch_size, dataset.max_length, 2])
 
 # Defining the LSTM cell and the dynamic RNN
 
@@ -45,20 +48,18 @@ x_unstacked = tf.unstack(x, dataset.max_length, 1)
 # Creating the LSTM cell (I am using the default parameter for now)
 lstm_cell = rnn.BasicLSTMCell(num_hidden)
 # Getting the outputs
-outputs, states = tf.nn.dynamic_rnn(lstm_cell, x, dtype=tf.float16)
+outputs, states = tf.nn.dynamic_rnn(lstm_cell, x, dtype=tf.float32)
 # The output is of shape [batch_size, max_length, num_hidden]
 # We need [batch_size, max_length, 2] so we do matrix mutiplication
 # The shape of matrix is [num_hidden, 2]
-weight = tf.random_normal([1, num_hidden, 2], dtype=tf.float16)
+weight = tf.random_normal([1, num_hidden, 2], dtype=tf.float32)
 y = tf.matmul(outputs, weight)
 
 netOutput = tf.nn.softmax(y)
-# A tiny amount is added to y to keep it from producing a NaN
-# 0*log(0) = NaN
-# However, this introduces a bit of bias.
-# But it is small enough to be acceptable
-loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-    logits=y + 1e-10, labels=y_))
+# The previous solutions failed.
+# I am going to test if cross entropy without softmax works
+cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=y, labels=y_)
+loss = tf.reduce_sum(cross_entropy)
 # I am using Adam as it has built-in learning rate reduction.
 # The moments also help speed up the learning.
 # Plus I am lazy.
@@ -109,6 +110,6 @@ with tf.Session() as sess:
 
         if(s % SAVER_STEP == 0):
             path = saver.save(sess,
-                              "../checkpoints",
+                              "../checkpoints/checkpoint",
                               global_step=checkpoint)
             print("Saved checkpoint to %s" % (path))

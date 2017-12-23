@@ -80,7 +80,7 @@ def getSoundData(FNAME, max_length):
     max_length: the length of the maximum recordings
     Output:
     A numpy array/tensor of shape [1,max_length,1]"""
-    ret = np.zeros([1, max_length, 1], dtype=np.float16)
+    ret = np.zeros([1, max_length, 1], dtype=np.float32)
     samples = importWavFile(FNAME)
     for i in range(len(samples)):
         ret[0, i, 0] = samples[i]
@@ -98,7 +98,7 @@ def createLabel(locationsByType, max_length):
     A numpy array of shape [1,max_length, number of sound types]
     It contains 0 in all points except in points where the locations is """
     soundTypes = locationsByType.keys()
-    label = np.zeros([1, max_length, len(soundTypes)], np.float16)
+    label = np.zeros([1, max_length, len(soundTypes)], np.float32)
     i = 0
     for t in soundTypes:
         locations = locationsByType[t]
@@ -198,8 +198,8 @@ class timingDataset:
         end = self.index_train
         cur_perm = self.perm[start:end]
         # Loading and returning the data
-        data = np.zeros([batch_size, self.max_length, 1])
-        label = np.zeros([batch_size, self.max_length, 2])
+        data = np.zeros([batch_size, self.max_length, 1], dtype=np.float32)
+        label = np.zeros([batch_size, self.max_length, 2], dtype=np.float32)
         for i in range(batch_size):
             p = cur_perm[i]
             data[i, :, :] = getSoundData(self.keys_train[p], self.max_length)
@@ -220,8 +220,8 @@ class timingDataset:
 
         end = self.index_valid
         # Loading the data and returning it
-        data = np.zeros([batch_size, self.max_length, 1])
-        label = np.zeros([batch_size, self.max_length, 2])
+        data = np.zeros([batch_size, self.max_length, 1], dtype=np.float32)
+        label = np.zeros([batch_size, self.max_length, 2], dtype=np.float32)
         ord = range(start, end)
         for i in range(batch_size):
             o = ord[i]
