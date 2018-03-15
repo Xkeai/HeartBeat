@@ -32,13 +32,15 @@ SAVER_STEP = 10
 training_steps = 10**4
 batch_size = 1
 
+diff_n = 0
+
 # Creating the network:
 # Defining the input
 
 # The data
-x = tf.placeholder(tf.float32, [batch_size, dataset.max_length, 1])
+x = tf.placeholder(tf.float32, [batch_size, dataset.max_length - diff_n, 1])
 # The label/target
-y_ = tf.placeholder(tf.float32, [batch_size, dataset.max_length, 2])
+y_ = tf.placeholder(tf.float32, [batch_size, dataset.max_length - diff_n, 2])
 
 # Defining the LSTM cell and the dynamic RNN
 
@@ -82,7 +84,7 @@ with tf.Session() as sess:
     sess.run(init)
 
     for s in range(training_steps + 1):
-        train_data, train_label = dataset.next_batch_train(batch_size)
+        train_data, train_label = dataset.next_batch_train(batch_size, diff_n)
         sess.run(train_op, feed_dict={x: train_data, y_: train_label})
 
         if(s % LOG_STEP == 0):
@@ -96,7 +98,8 @@ with tf.Session() as sess:
             valid_loss = 0
             no_valid = 0
             while True:
-                valid_data, valid_label, ended = dataset.next_batch_valid(1)
+                valid_data, valid_label, ended = dataset.next_batch_valid(
+                    1, diff_n)
                 if ended == -1:
                     break
                 valid_loss += sess.run(

@@ -82,9 +82,9 @@ def getSoundData(FNAME, max_length):
     A numpy array/tensor of shape [1,max_length,1]"""
     ret = np.zeros([1, max_length, 1], dtype=np.float32)
     samples = importWavFile(FNAME)
-    for i in range(len(samples)):
-        ret[0, i, 0] = samples[i]
-
+    print(type(samples))
+    print(len(samples))
+    ret[0, :len(samples), 0] = samples[:]
     return ret
 
 
@@ -183,7 +183,12 @@ class timingDataset:
         self.perm = np.arange(self.no_train)
         np.random.shuffle(self.perm)
 
-    def next_batch_train(self, batch_size=1):
+    def next_batch_train(self, batch_size=1, diff_n=0, normalise=True):
+        """
+        Get the batch for the training
+        batch_size is the number of elements we want
+        diff_n is the lag we want for the differentiation
+        """
         # Figuring out the data to send
         start = self.index_train
         self.index_train += batch_size
@@ -193,11 +198,12 @@ class timingDataset:
             # Reshuffle the order and restart
             self.get_new_permutation()
             start = 0
+
             self.index_train = batch_size
 
         end = self.index_train
         cur_perm = self.perm[start:end]
-        # Loading and returning the data
+        # Loading the dataur
         data = np.zeros([batch_size, self.max_length, 1], dtype=np.float32)
         label = np.zeros([batch_size, self.max_length, 2], dtype=np.float32)
         for i in range(batch_size):
@@ -205,9 +211,22 @@ class timingDataset:
             data[i, :, :] = getSoundData(self.keys_train[p], self.max_length)
             label[i, :, :] = createLabel(self.timingInfo[self.keys_train[p]],
                                          self.max_length)
+        # Preforming for some pre-treatement
+        # Normalising if necessary
+        if(normalise):
+            data = (data - np.amin(data, axis=1))
+            data = data / np.amax(data, axis=1)
+        # We attempt to take the difference to get better performance
+        data = np.diff(data, axis=1, n=diff_n)
+        label = label[:, diff_n:, :]
         return data, label
 
-    def next_batch_valid(self, batch_size=1):
+    def next_batch_valid(self, batch_size=1, diff_n=0):
+        """
+        Get the batch for the training
+        batch_size is the number of elements we want
+        diff_n is the lag we want for the differentiation
+        """
         # Figuring out which data to send
         start = self.index_valid
         self.index_valid += batch_size
@@ -219,7 +238,7 @@ class timingDataset:
             return -1, -1, -1
 
         end = self.index_valid
-        # Loading the data and returning it
+        # Loading the data
         data = np.zeros([batch_size, self.max_length, 1], dtype=np.float32)
         label = np.zeros([batch_size, self.max_length, 2], dtype=np.float32)
         ord = range(start, end)
@@ -228,4 +247,8 @@ class timingDataset:
             data[i, :, :] = getSoundData(self.keys_valid[o], self.max_length)
             label[i, :, :] = createLabel(self.timingInfo[self.keys_valid[o]],
                                          self.max_length)
+        # Preforming for some pre-treatement
+        # We attempt to take the difference to get better performance
+        data = np.diff(data, axis=1, n=diff_n)
+        label = label[:, diff_n:, :]
         return data, label, 1
