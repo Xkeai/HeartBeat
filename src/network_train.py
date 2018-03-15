@@ -84,6 +84,7 @@ with tf.Session() as sess:
     sess.run(init)
 
     for s in range(training_steps + 1):
+        print("step " + s)
         train_data, train_label = dataset.next_batch_train(batch_size, diff_n)
         sess.run(train_op, feed_dict={x: train_data, y_: train_label})
 
