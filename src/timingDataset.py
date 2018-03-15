@@ -82,8 +82,6 @@ def getSoundData(FNAME, max_length):
     A numpy array/tensor of shape [1,max_length,1]"""
     ret = np.zeros([1, max_length, 1], dtype=np.float32)
     samples = importWavFile(FNAME)
-    print(type(samples))
-    print(len(samples))
     ret[0, :len(samples), 0] = samples[:]
     return ret
 
