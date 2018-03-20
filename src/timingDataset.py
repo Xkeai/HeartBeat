@@ -72,7 +72,7 @@ def findMaxLength(filenames):
     return max(lengths)
 
 
-def getSoundData(FNAME, max_length):
+def getSoundData(FNAME, max_length=-1):
     """ getSoundData:
     import the recordings from files and puts them in the right format
     Input:
@@ -80,8 +80,10 @@ def getSoundData(FNAME, max_length):
     max_length: the length of the maximum recordings
     Output:
     A numpy array/tensor of shape [1,max_length,1]"""
-    ret = np.zeros([1, max_length, 1], dtype=np.float32)
     samples = importWavFile(FNAME)
+    if(max_length == -1):
+        max_length = len(samples)
+    ret = np.zeros([1, max_length, 1], dtype=np.float32)
     ret[0, :len(samples), 0] = samples[:]
     return ret
 
@@ -106,7 +108,7 @@ def createLabel(locationsByType, max_length):
     return label
 
 
-def testSoundFiles(filenames, max_length):
+def testSoundFiles(filenames):
     """ testSoundFiles
     Imports the sounds files and runs a few test on them.
     Input:
@@ -122,7 +124,7 @@ def testSoundFiles(filenames, max_length):
     is_None_vec = np.vectorize(lambda x: x is None)
 
     for fname in filenames:
-        data = getSoundData(fname, max_length)
+        data = getSoundData(fname)
         if(data is None):
             print("problem importing:" + fname)
             noProblem = False
@@ -139,8 +141,12 @@ def testSoundFiles(filenames, max_length):
 
 
 class timingDataset:
+    """
+    This is an object to manage the data for the timing task
 
-    def __init__(self, FNAME, fnamePrefix='../data/'):
+    """
+
+    def __init__(self, FNAME, fnamePrefix='../data/', normalise=True):
         # Importing the meta data
         self.timingInfo = getTimingInfo(FNAME, fnamePrefix=fnamePrefix)
         # Counting the data points
@@ -156,13 +162,28 @@ class timingDataset:
         # We need to have the max_length for we construct the tensors
         self.max_length = findMaxLength(self.timingInfo.keys())
         # Testing the soundFiles
-        if(not testSoundFiles(self.timingInfo.keys(), self.max_length)):
+        if(not testSoundFiles(self.timingInfo.keys())):
             raise ValueError("Invalid values for the recordings")
-        # Lastly, we have some variables for following progress of training
+        # The user can choose the size of the data they want.
+        # To keep track of which data to return we have two cursors
+        # The first one keep track of which sample we are using
+        # The second keeps track of where we are in the sample
         self.index_train = 0
+        self.index_sample_train = 0
+        self.current_data_train = None
+        self.current_label_train = None
+
+        # Naturally we have a second set for validation
         self.index_valid = 0
+        self.index_sample_valid = 0
+        self.current_data_valid = None
+        self.current_label_valid = None
+
         self.epochs = 0
         self.get_new_permutation()
+
+        # Lastly, parameter for pre-treatement of data
+        self.normalise = normalise
 
     def reset(self):
         """
@@ -171,6 +192,7 @@ class timingDataset:
         self.index_train = 0
         self.index_valid = 0
         self.epochs = 0
+        self.get_new_permutation()
 
     def get_new_permutation(self):
         """
@@ -181,72 +203,129 @@ class timingDataset:
         self.perm = np.arange(self.no_train)
         np.random.shuffle(self.perm)
 
-    def next_batch_train(self, batch_size=1, diff_n=0, normalise=True):
-        """
-        Get the batch for the training
-        batch_size is the number of elements we want
-        diff_n is the lag we want for the differentiation
-        """
-        # Figuring out the data to send
-        start = self.index_train
-        self.index_train += batch_size
-        if self.index_train > self.no_train:
-            # Completed an epoch
-            self.epochs += 1
-            # Reshuffle the order and restart
-            self.get_new_permutation()
-            start = 0
-
-            self.index_train = batch_size
-
-        end = self.index_train
-        cur_perm = self.perm[start:end]
-        # Loading the dataur
-        data = np.zeros([batch_size, self.max_length, 1], dtype=np.float32)
-        label = np.zeros([batch_size, self.max_length, 2], dtype=np.float32)
-        for i in range(batch_size):
-            p = cur_perm[i]
-            data[i, :, :] = getSoundData(self.keys_train[p], self.max_length)
-            label[i, :, :] = createLabel(self.timingInfo[self.keys_train[p]],
-                                         self.max_length)
-        # Preforming for some pre-treatement
-        # Normalising if necessary
-        if(normalise):
+    def get_new_samples(self, key):
+        # First getting the data
+        data = getSoundData(key)
+        if(self.normalise):
             data = (data - np.amin(data, axis=1))
             data = data / np.amax(data, axis=1)
-        # We attempt to take the difference to get better performance
-        data = np.diff(data, axis=1, n=diff_n)
-        label = label[:, diff_n:, :]
-        return data, label
+        length = data.shape[1]
+        # Then the labels
+        locationsByType = self.timingInfo[key]
+        soundTypes = locationsByType.keys()
+        label = np.zeros([1, length, len(soundTypes)], dtype=np.float32)
+        i = 0
+        for t in soundTypes:
+            locations = locationsByType[t]
+            for l in locations:
+                label[0, l, i] = 1
+            i = i + 1
 
-    def next_batch_valid(self, batch_size=1, diff_n=0):
+        return (data, label)
+
+    def next_batch_train(self, batch_size=1, data_length=int(1e5), step_size=int(1e3)):
+        """
+        Get the batch for the training
+        batch_size is the number of elements we want
+        """
+        data = np.zeros([batch_size, data_length, 1], dtype=np.float32)
+        labels = np.zeros([batch_size, data_length, 2], dtype=np.float32)
+
+        b = 0
+        ready = True
+        while(b < batch_size):
+            # If we are at the end of the current epoch
+            if(self.index_train >= self.no_train):
+                # Emptying the current samples
+                self.current_data_train = None
+                self.current_label_train = None
+                # Resetting the indicators and incrementing the epoch counter
+                self.index_train = 0
+                self.index_sample_train = 0
+                self.get_new_permutation()
+                self.epochs += 1
+            # If the samples are not imported yet, we need to import them
+            if self.current_data_train is None:
+                # Getting the key to get the samples
+                key = self.perm[self.index_train]
+                key = self.keys_train[key]
+                # Getting new samples
+                data_train, label_train = self.get_new_samples(key)
+                self.current_data_train = data_train
+                self.current_label_train = label_train
+
+            # Setting the limits
+            start = self.index_sample_train
+            end = start + data_length
+            ready = True
+            # We are at the end of the current samples
+            if (end > self.current_data_train.shape[1]):
+                # Incrementing and resetting the indexes
+                self.index_train += 1
+                self.index_sample_train = 0
+                # Emptying the samples
+                self.current_data_train = None
+                self.current_label_train = None
+                ready = False
+            # When we are ready, we get the data
+            if(ready):
+                data[b, :, :] = self.current_data_train[0, start:end, :]
+                labels[b, :, :] = self.current_label_train[0, start:end, :]
+                self.index_sample_train += step_size
+                b += 1
+
+        return(data, labels)
+
+    def next_batch_valid(self, batch_size=1, data_length=int(1e5), step_size=int(1e3)):
         """
         Get the batch for the training
         batch_size is the number of elements we want
         diff_n is the lag we want for the differentiation
         """
-        # Figuring out which data to send
-        start = self.index_valid
-        self.index_valid += batch_size
-        if self.index_valid > self.no_valid:
-            # Unlike train, we want the called of this function to know that
-            # they are done with the set
-            # Hence why we send -1,-1, -1
-            self.index_valid = 0
-            return -1, -1, -1
+        data = np.zeros([batch_size, data_length, 1], dtype=np.float32)
+        labels = np.zeros([batch_size, data_length, 2], dtype=np.float32)
 
-        end = self.index_valid
-        # Loading the data
-        data = np.zeros([batch_size, self.max_length, 1], dtype=np.float32)
-        label = np.zeros([batch_size, self.max_length, 2], dtype=np.float32)
-        ord = range(start, end)
-        for i in range(batch_size):
-            o = ord[i]
-            data[i, :, :] = getSoundData(self.keys_valid[o], self.max_length)
-            label[i, :, :] = createLabel(self.timingInfo[self.keys_valid[o]],
-                                         self.max_length)
-        # Preforming for some pre-treatement
-        # We attempt to take the difference to get better performance
-        data = np.diff(data, axis=1, n=diff_n)
-        label = label[:, diff_n:, :]
-        return data, label, 1
+        b = 0
+        ready = True
+        while(b < batch_size):
+            # If we are at the end of the current epoch
+            if(self.index_valid >= self.no_valid):
+                # Emptying the current samples
+                self.current_data_train = None
+                self.current_label_valid = None
+                # Resetting the indicators and incrementing the epoch counter
+                self.index_valid = 0
+                self.index_sample_valid = 0
+
+                return(-1, -1, -1)
+            # If the samples are not imported yet, we need to import them
+            if self.current_data_valid is None:
+                # Getting the key to get the samples
+                key = self.index_valid
+                key = self.keys_valid[key]
+                # Getting new samples
+                data_valid, label_valid = self.get_new_samples(key)
+                self.current_data_valid = data_valid
+                self.current_label_valid = label_valid
+
+            # Setting the limits
+            start = self.index_sample_valid
+            end = start + data_length
+            ready = True
+            # We are at the end of the current samples
+            if (end > self.current_data_valid.shape[1]):
+                # Incrementing and resetting the indexes
+                self.index_valid += 1
+                self.index_sample_valid = 0
+                # Emptying the samples
+                self.current_data_valid = None
+                self.current_label_valid = None
+                ready = False
+            # When we are ready, we get the data
+            if(ready):
+                data[b, :, :] = self.current_data_valid[0, start: end, :]
+                labels[b, :, :] = self.current_label_valid[0, start: end, :]
+                self.index_sample_valid += step_size
+                b += 1
+
+        return(data, labels, 1)

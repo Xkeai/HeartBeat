@@ -1,34 +1,53 @@
-import numpy as np
 import pandas as pd
-from ggplot import *
+import numpy as np
 
-
+import matplotlib.pyplot as plt
 from timingDataset import timingDataset
 
-
+# Getting the dataset
 dataset = timingDataset("../data/set_a_timing.csv")
 
-data_diff_0, label_diff_0 = dataset.next_batch_train()
+# Some variables
+
+num_hidden = 16
+learning_rate = 10**-6
+batch_size = 1
+
+diff_n = 0
+# Getting one samples
+data, label = dataset.next_batch_train()
+
+# Transforming the data
+
+t = range(data.shape[1])
+s1_loc = np.where(label[0, :, 0] == 1)[0]
+s2_loc = np.where(label[0, :, 1] == 1)[0]
+
+# Plotting
+fig, ax = plt.subplots()
+ax.plot(t, data[0, :, 0], 'black')
+ax.vlines(s1_loc, 0, 1, transform=ax.get_xaxis_transform(), colors='r')
+ax.vlines(s2_loc, 0, 1, transform=ax.get_xaxis_transform(), colors='b')
+
+ax.grid()
+
+plt.show()
+
+
+batches_valid = 0
+while True:
+    valid_data, valid_label, ended = dataset.next_batch_valid()
+    if ended == -1:
+        break
+    batches_valid += 1
+
+print(batches_valid)
 dataset.reset()
-data_diff_1, label_diff_1 = dataset.next_batch_train(diff_n=1)
+batches_train = 0
+while True:
+    data, label = dataset.next_batch_train()
+    if dataset.epochs > 1:
+        break
+    batches_train += 1
 
-
-print(data_diff_0.shape)
-print(data_diff_1.shape)
-
-
-df_0 = pd.DataFrame(data_diff_0[:, :, 0].transpose(), columns=["wave"])
-df_0["index"] = df_0.index
-df_1 = pd.DataFrame(data_diff_1[:, :, 0].transpose(), columns=["wave"])
-df_1["index"] = df_1.index
-
-
-p0 = ggplot(df_0, aes(x="index", y="wave")) +\
-    geom_line()
-
-p1 = ggplot(df_1, aes(x="index", y="wave")) +\
-    geom_line()
-
-
-print(p0)
-print(p1)
+print(batches_train)

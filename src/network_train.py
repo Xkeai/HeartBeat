@@ -4,14 +4,13 @@
 # https://github.com/aymericdamien/TensorFlow-Examples/blob/master/examples/3_NeuralNetworks/recurrent_network.py
 
 import tensorflow as tf
-import numpy as np
+
+from network_definitions import singleRNN_Segmentation
 
 import logger
 
-from timingDataset import timingDataset
-from tensorflow.contrib import rnn
 
-import math
+from timingDataset import timingDataset
 
 # Creating the dataset
 dataset = timingDataset("../data/set_a_timing.csv")
@@ -24,55 +23,23 @@ log = logger.LogWriter(logFname, fields)
 # Defining some general variables to be used in the graph
 # and the learning process
 
+# The number of hidden units for the RNN
 num_hidden = 16
-learning_rate = 10**-6
+# The Learning rate for the optimizer
+learning_rate = 10**-3
+# The length of the data
+data_length = int(1e5)
+step_size = int(5e4)
 
+# Some variables to control the training
 LOG_STEP = 10
 SAVER_STEP = 10
 training_steps = 10**4
 batch_size = 1
 
-diff_n = 0
-
 # Creating the network:
-# Defining the input
-
-# The data
-x = tf.placeholder(tf.float32, [batch_size, dataset.max_length - diff_n, 1])
-# The label/target
-y_ = tf.placeholder(tf.float32, [batch_size, dataset.max_length - diff_n, 2])
-
-# Defining the LSTM cell and the dynamic RNN
-
-# We first have to transform out [batch_size, max_length, 1] shaped input
-# into a list of [batch_size, 1] tensor of length [max_length]
-x_unstacked = tf.unstack(x, dataset.max_length, 1)
-# Creating the LSTM cell (I am using the default parameter for now)
-lstm_cell = rnn.BasicLSTMCell(num_hidden)
-# Getting the outputs
-outputs, states = tf.nn.dynamic_rnn(lstm_cell, x, dtype=tf.float32)
-# The output is of shape [batch_size, max_length, num_hidden]
-# We need [batch_size, max_length, 2] so we do matrix mutiplication
-# The shape of matrix is [num_hidden, 2]
-weight = tf.random_normal([1, num_hidden, 2], dtype=tf.float32)
-y = tf.matmul(outputs, weight)
-
-netOutput = tf.nn.softmax(y)
-# The previous solutions failed.
-# I am going to test if cross entropy without softmax works
-cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(logits=y, labels=y_)
-loss = tf.reduce_sum(cross_entropy)
-# I am using Adam as it has built-in learning rate reduction.
-# The moments also help speed up the learning.
-# Plus I am lazy.
-optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-train_op = optimizer.minimize(loss)
-
-
-# There is a small problem with error.
-# I am unsure about how to define the error.
-# I am going to think it through and figure out a precise and proper
-# definition.
+x, y, y_, loss, train_op = singleRNN_Segmentation(
+    num_hidden, data_length, learning_rate, batch_size)
 
 # The initialiser of the variables in the graph
 init = tf.global_variables_initializer()
@@ -85,7 +52,9 @@ with tf.Session() as sess:
 
     for s in range(training_steps + 1):
         print("step %d" % s)
-        train_data, train_label = dataset.next_batch_train(batch_size, diff_n)
+        train_data, train_label = dataset.next_batch_train(batch_size,
+                                                           data_length=data_length,
+                                                           step_size=step_size)
         sess.run(train_op, feed_dict={x: train_data, y_: train_label})
 
         if(s % LOG_STEP == 0):
@@ -100,7 +69,9 @@ with tf.Session() as sess:
             no_valid = 0
             while True:
                 valid_data, valid_label, ended = dataset.next_batch_valid(
-                    1, diff_n)
+                    1,
+                    data_length=data_length,
+                    step_size=step_size)
                 if ended == -1:
                     break
                 valid_loss += sess.run(
