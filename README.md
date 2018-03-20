@@ -16,18 +16,12 @@ There are 3 .csv files.
 * set_a_timing contains the segmantation for different sounds during a heartbeat.
 
 
+# Current state:
+
+The sound samples are now being cut into smaller pieces before being feed into the network. These samples are extracted using a sliding window scheme.
+
 # Plans:
 
-Now that the NaN loss issue is resolved, I can try a few things.
+* Train the LSTM and check performance
 
-The current network is an LSTM whose output is passed through a single layer neural network to reduce its size. Unforunately, as of today (23.12.2017), I do not have access to machine powerful enough to train my network. So I do not know the full performance of this network. In the coming weeks, I will look into cloud. 
-
-What can be done:
-
-* Increase the size of the LSTM.
-
-* Increase the size of the single-layer neurons.
-
-* Filter the data (with the possibility of filtering using a trainable convnet)
-
-* A seperate network in Fourier space
+* Try out a convnet version
