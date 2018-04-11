@@ -203,33 +203,40 @@ class timingDataset:
         self.perm = np.arange(self.no_train)
         np.random.shuffle(self.perm)
 
-    def get_new_samples(self, key):
+    def get_new_samples(self, key, label_reduction):
         # First getting the data
         data = getSoundData(key)
         if(self.normalise):
-            data = (data - np.amin(data, axis=1))
-            data = data / np.amax(data, axis=1)
+            div = np.amax(data, axis=1) - np.amin(data, axis=1)
+            data = data / div
         length = data.shape[1]
         # Then the labels
         locationsByType = self.timingInfo[key]
         soundTypes = locationsByType.keys()
-        label = np.zeros([1, length, len(soundTypes)], dtype=np.float32)
+        label = np.zeros([1, length / label_reduction, len(soundTypes)],
+                         dtype=np.float32)
         i = 0
         for t in soundTypes:
             locations = locationsByType[t]
             for l in locations:
-                label[0, l, i] = 1
+                label[0, l / label_reduction, i] = 1
             i = i + 1
 
         return (data, label)
 
-    def next_batch_train(self, batch_size=1, data_length=int(1e5), step_size=int(1e3)):
+    def next_batch_train(self,
+                         batch_size=1,
+                         data_length=10**5,
+                         step_size=10**3,
+                         label_reduction=1):
         """
         Get the batch for the training
         batch_size is the number of elements we want
         """
-        data = np.zeros([batch_size, data_length, 1], dtype=np.float32)
-        labels = np.zeros([batch_size, data_length, 2], dtype=np.float32)
+        data = np.zeros([batch_size, data_length, 1],
+                        dtype=np.float32)
+        labels = np.zeros([batch_size, data_length / label_reduction, 2],
+                          dtype=np.float32)
 
         b = 0
         ready = True
@@ -250,13 +257,18 @@ class timingDataset:
                 key = self.perm[self.index_train]
                 key = self.keys_train[key]
                 # Getting new samples
-                data_train, label_train = self.get_new_samples(key)
+                data_train, label_train = self.get_new_samples(
+                    key, label_reduction)
                 self.current_data_train = data_train
                 self.current_label_train = label_train
 
             # Setting the limits
             start = self.index_sample_train
             end = start + data_length
+            # If the expected data length is greater than the sample,
+            # we will use the whole sample and then zero pad
+            if(data_length > self.current_data_train.shape[1]):
+                end = self.current_data_train.shape[1]
             ready = True
             # We are at the end of the current samples
             if (end > self.current_data_train.shape[1]):
@@ -269,21 +281,42 @@ class timingDataset:
                 ready = False
             # When we are ready, we get the data
             if(ready):
-                data[b, :, :] = self.current_data_train[0, start:end, :]
-                labels[b, :, :] = self.current_label_train[0, start:end, :]
-                self.index_sample_train += step_size
+                data[b, 0:(end - start), :] = self.current_data_train[
+                    0, start: end, :]
+                start = start / label_reduction
+                end = end / label_reduction
+                labels[b, 0:(end - start), :] = self.current_label_train[
+                    0, start:end, :]
+                # If data length is longer than the sample,
+                # we move on to the next sample
+                if(data_length > self.current_data_train.shape[1]):
+                    # Incrementing and resetting the indexes
+                    self.index_train += 1
+                    self.index_sample_train = 0
+                    # Emptying the samples
+                    self.current_data_train = None
+                    self.current_label_train = None
+                # If not, we incrementing the cursor in the sample
+                else:
+                    self.index_sample_train += step_size
                 b += 1
 
         return(data, labels)
 
-    def next_batch_valid(self, batch_size=1, data_length=int(1e5), step_size=int(1e3)):
+    def next_batch_valid(self,
+                         batch_size=1,
+                         data_length=10**5,
+                         step_size=10 ** 3,
+                         label_reduction=1):
         """
         Get the batch for the training
         batch_size is the number of elements we want
         diff_n is the lag we want for the differentiation
         """
-        data = np.zeros([batch_size, data_length, 1], dtype=np.float32)
-        labels = np.zeros([batch_size, data_length, 2], dtype=np.float32)
+        data = np.zeros([batch_size, data_length, 1],
+                        dtype=np.float32)
+        labels = np.zeros([batch_size, data_length / label_reduction, 2],
+                          dtype=np.float32)
 
         b = 0
         ready = True
@@ -304,13 +337,18 @@ class timingDataset:
                 key = self.index_valid
                 key = self.keys_valid[key]
                 # Getting new samples
-                data_valid, label_valid = self.get_new_samples(key)
+                data_valid, label_valid = self.get_new_samples(
+                    key, label_reduction)
                 self.current_data_valid = data_valid
                 self.current_label_valid = label_valid
 
             # Setting the limits
             start = self.index_sample_valid
             end = start + data_length
+            # If the expected data length is greater than the sample,
+            # we will use the whole sample and then zero pad
+            if(data_length > self.current_data_valid.shape[1]):
+                end = self.current_data_valid.shape[1]
             ready = True
             # We are at the end of the current samples
             if (end > self.current_data_valid.shape[1]):
@@ -323,9 +361,24 @@ class timingDataset:
                 ready = False
             # When we are ready, we get the data
             if(ready):
-                data[b, :, :] = self.current_data_valid[0, start: end, :]
-                labels[b, :, :] = self.current_label_valid[0, start: end, :]
-                self.index_sample_valid += step_size
+                data[b, :(end - start), 0] = self.current_data_valid[
+                    0, start: end, 0]
+                start = start / label_reduction
+                end = end / label_reduction
+                labels[b, :(end - start), :] = self.current_label_valid[
+                    0, start: end, :]
+                # If data length is longer than the sample,
+                # we move on to the next sample
+                if(data_length > self.current_data_valid.shape[1]):
+                    # Incrementing and resetting the indexes
+                    self.index_valid += 1
+                    self.index_sample_valid = 0
+                    # Emptying the samples
+                    self.current_data_valid = None
+                    self.current_label_valid = None
+                # If not, we incrementing the cursor in the sample
+                else:
+                    self.index_sample_valid += step_size
                 b += 1
 
         return(data, labels, 1)
