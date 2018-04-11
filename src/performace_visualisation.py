@@ -2,7 +2,7 @@ from ggplot import *
 
 import pandas as pd
 
-perf_log = pd.read_csv("../logs/log_180316_0843.csv")
+perf_log = pd.read_csv("../logs/log_180408_1244.csv")
 perf_log_tidy = pd.melt(perf_log,
                         id_vars=["train_step", "epoch"],
                         value_vars=["train_loss", "valid_loss"])
