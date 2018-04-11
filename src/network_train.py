@@ -5,8 +5,6 @@
 
 import tensorflow as tf
 
-from network_definitions import singleRNN_Segmentation
-
 import logger
 
 
@@ -23,13 +21,16 @@ log = logger.LogWriter(logFname, fields)
 # Defining some general variables to be used in the graph
 # and the learning process
 
-# The number of hidden units for the RNN
-num_hidden = 16
+# The number of conv+max_pool layers we will have
+n_layers = 7
+# The number of filter for each convolutional layer
+n_filters = [8, 8, 8, 8, 8, 4, 2]
+kernel_size = [2**(n_layers - n) for n in range(n_layers)]
 # The Learning rate for the optimizer
-learning_rate = 10**-3
+learning_rate = 0.01
 # The length of the data
-data_length = int(1e5)
-step_size = int(5e4)
+data_length = 2**13
+step_size = 2**11
 
 # Some variables to control the training
 LOG_STEP = 10
@@ -38,8 +39,54 @@ training_steps = 10**4
 batch_size = 1
 
 # Creating the network:
-x, y, y_, loss, train_op = singleRNN_Segmentation(
-    num_hidden, data_length, learning_rate, batch_size)
+
+# The Input
+x = tf.placeholder(tf.float32,
+                   [batch_size, data_length, 1],
+                   name="x")
+# The label/target
+y_ = tf.placeholder(tf.float32,
+                    [batch_size, data_length / (2**n_layers), 2],
+                    name="y_")
+
+# Reshaping the arguments
+xr = tf.reshape(x, shape=[batch_size, data_length, 1, 1])
+yr_ = tf.reshape(y_, shape=[batch_size, data_length / (2**n_layers), 1, 2])
+
+conv_out = xr
+
+# The convolution + pooling layers
+for i in range(n_layers):
+    h_conv = tf.layers.conv2d(
+        inputs=conv_out,
+        filters=n_filters[i],
+        kernel_size=[kernel_size[i], 1],
+        padding="same",
+        activation=tf.nn.relu,
+        kernel_initializer=tf.truncated_normal_initializer(),
+        name=("conv_%d" % i))
+
+    h_pool = tf.layers.max_pooling2d(
+        inputs=h_conv,
+        pool_size=[2, 1],
+        strides=2,
+        name=("pool_%d" % i))
+    conv_out = h_pool
+
+# Training operations
+y = tf.sigmoid(conv_out, name="y")
+
+# Calculating the loss
+cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
+    logits=conv_out,
+    labels=yr_)
+loss = tf.reduce_sum(cross_entropy)
+# I am using Adam as it has built-in learning rate reduction.
+# The moments also help speed up the learning.
+# Plus I am lazy.
+optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+train_op = optimizer.minimize(loss)
+
 
 # The initialiser of the variables in the graph
 init = tf.global_variables_initializer()
@@ -52,9 +99,12 @@ with tf.Session() as sess:
 
     for s in range(training_steps + 1):
         print("step %d" % s)
-        train_data, train_label = dataset.next_batch_train(batch_size,
-                                                           data_length=data_length,
-                                                           step_size=step_size)
+        train_data, train_label = dataset.next_batch_train(
+            batch_size,
+            data_length=data_length,
+            step_size=step_size,
+            label_reduction=2**n_layers)
+
         sess.run(train_op, feed_dict={x: train_data, y_: train_label})
 
         if(s % LOG_STEP == 0):
@@ -69,9 +119,11 @@ with tf.Session() as sess:
             no_valid = 0
             while True:
                 valid_data, valid_label, ended = dataset.next_batch_valid(
-                    1,
+                    batch_size,
                     data_length=data_length,
-                    step_size=step_size)
+                    step_size=step_size,
+                    label_reduction=2**n_layers)
+
                 if ended == -1:
                     break
                 valid_loss += sess.run(
