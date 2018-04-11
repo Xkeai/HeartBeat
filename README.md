@@ -18,10 +18,6 @@ There are 3 .csv files.
 
 # Current state:
 
-The sound samples are now being cut into smaller pieces before being feed into the network. These samples are extracted using a sliding window scheme.
+I approached the timing task as a segmentation tasks. I attempted to use a both RNNs and CNNs for this and both have show disappoiting results.
 
-# Plans:
-
-* Train the LSTM and check performance
-
-* Try out a convnet version
+So I am going to change my approach. I am going to treat the timing task as a categorisation task on patches of the sound recording. Thus by iteratively sliding a patch on the input recording, I can use the neural network to segment the input. I also plan on turning the problem into a image classification problem by transforming the sounds into an image. There are several transformation that do this so I will be researching for a bit. 
