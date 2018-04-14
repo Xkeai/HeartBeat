@@ -16,8 +16,6 @@ There are 3 .csv files.
 * set_a_timing contains the segmantation for different sounds during a heartbeat.
 
 
-# Current state:
+# Branch Description:
 
-I approached the timing task as a segmentation tasks. I attempted to use a both RNNs and CNNs for this and both have show disappoiting results.
-
-So I am going to change my approach. I am going to treat the timing task as a categorisation task on patches of the sound recording. Thus by iteratively sliding a patch on the input recording, I can use the neural network to segment the input. I also plan on turning the problem into a image classification problem by transforming the sounds into an image. There are several transformation that do this so I will be researching for a bit. 
+In this branch, the data is a neighbourhood of values around a particular sound in the recordings. These sounds are then transformed from a 1-D signal to a 2D signal using a melspectrogram. This, in essence, transforms th sound classification task into a image classification task. A Convnet would then be trained on this data. After the convnet is sufficiently classified, it will be iteratively applied to windows to segment the recordings.
