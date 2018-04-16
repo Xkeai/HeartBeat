@@ -18,4 +18,4 @@ There are 3 .csv files.
 
 # Branch Description:
 
-In this branch, the data is a neighbourhood of values around a particular sound in the recordings. These sounds are then transformed from a 1-D signal to a 2D signal using a melspectrogram. This, in essence, transforms th sound classification task into a image classification task. A Convnet would then be trained on this data. After the convnet is sufficiently trained, it will be iteratively applied to windows to segment the recordings.
+In this branch, the data is a neighbourhood of values around a particular sound in the recordings. These sounds are then transformed from a 1-D signal to a 2D signal using a stft. This, in essence, transforms the sound classification task into a image classification task. A Convnet would then be trained on this data. After the convnet is sufficiently trained, it will be iteratively applied to windows to segment the recordings.
