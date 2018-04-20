@@ -11,34 +11,27 @@ import numpy as np
 import wave
 import struct
 
-from math import isnan
-
 
 def getTimingInfo(FNAME, fnamePrefix=''):
     """ getTimingInfo:
     A parser for the csv file.
     Input:
-    FNAME: filename of a csv
+    FNAME: name of a csv file
     The csv contains the filename of the recordings,
     and the location and type of the sounds
     Output:
-    timingInfo: A dictionary
-    -> keys: filename of the soundfile
-    -> value: a dictionary whose keys are sound types and
-    the value is a list of the locations"""
-    timingInfo = {}
+    timingInfo: A list which contains 3 dimensionals tuples:
+    (soundFname, location, category)
+    """
+    timingInfo = list()
     with open(FNAME, 'r') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             soundFname = os.path.join(fnamePrefix, row['fname'])
-            # If this file doesn't have already have a dict,
-            # we need to create one.
-            # This is caused by the way python deals with lists, not dicts
-            if soundFname not in timingInfo:
-                timingInfo[soundFname] = {'S1': list(), 'S2': list()}
+            soundLocation = int(row['location'])
             soundType = row['sound']
-            soundLocation = row['location']
-            timingInfo[soundFname][soundType].append(int(soundLocation))
+            datapoint = (soundFname, soundLocation, soundType)
+            timingInfo.append(datapoint)
     return timingInfo
 
 
@@ -55,144 +48,105 @@ def importWavFile(FNAME):
     f = wave.open(FNAME)
     frames = f.readframes(-1)
     samples = struct.unpack('h' * f.getnframes(), frames)
-    return samples
+    return np.array(samples)
 
 
-def findMaxLength(filenames):
-    """ findMaxLength:
-    Goes through the files and checks their lengths. Returns the max
+def getNeighbourhoodFromSample(samples, loc, nbefore, nafter):
+    """ getNeighbourhoodFromSample
+    Extract a neighboorhood of values around a location in a sample
     Input:
-    filenames: A list of strings that contain the path to a wav file
+    sample: a 1-D numpy array containing the values of the recording
+    loc: The location that the neighbourhood is going to be around
+    nbefore: the number of values to be taken before loc
+    nafter: the number of values to be taken after loc
     Output:
-    The maximum length of all the wav files"""
-    lengths = list()
-    for fname in filenames:
-        recording = importWavFile(fname)
-        lengths.append(len(recording))
-    return max(lengths)
-
-
-def getSoundData(FNAME, max_length=-1):
-    """ getSoundData:
-    import the recordings from files and puts them in the right format
-    Input:
-    FNAME: file name of recording
-    max_length: the length of the maximum recordings
-    Output:
-    A numpy array/tensor of shape [1,max_length,1]"""
-    samples = importWavFile(FNAME)
-    if(max_length == -1):
-        max_length = len(samples)
-    ret = np.zeros([1, max_length, 1], dtype=np.float32)
-    ret[0, :len(samples), 0] = samples[:]
-    return ret
-
-
-def createLabel(locationsByType, max_length):
-    """ createLabel
-    creates the label for based the location of various sounds
-    Input:
-    locationsByType: A dictionary whose keys are the types and the values are lists of location
-    max_length: The length of the output tensor
-    Output:
-    A numpy array of shape [1,max_length, number of sound types]
-    It contains 0 in all points except in points where the locations is """
-    soundTypes = locationsByType.keys()
-    label = np.zeros([1, max_length, len(soundTypes)], np.float32)
-    i = 0
-    for t in soundTypes:
-        locations = locationsByType[t]
-        for l in locations:
-            label[0, l, i] = 1
-        i = i + 1
-    return label
-
-
-def testSoundFiles(filenames):
-    """ testSoundFiles
-    Imports the sounds files and runs a few test on them.
-    Input:
-    filenames: A list of strings
-    Output:
-    True if all test ae successful, False if not
-    Side-effect:
-    If there is a problem, prints out a text explaining the problem.
+    A numpy array of shape [size].
+    The data is zero-padded in the end as necessary.
     """
-    noProblem = True
+    V = np.zeros(shape=[nbefore + nafter])
+    start = loc - nbefore
+    if start < 0:
+        start = 0
+    end = loc + nafter
+    if end > samples.shape[0]:
+        end = samples.shape[0]
+    V[0:(end - start)] = samples[start:end]
+    return V
 
-    is_nan_vec = np.vectorize(isnan)
-    is_None_vec = np.vectorize(lambda x: x is None)
 
-    for fname in filenames:
-        data = getSoundData(fname)
-        if(data is None):
-            print("problem importing:" + fname)
-            noProblem = False
-            break
-        if(is_nan_vec(data).any()):
-            print("Invalid data 'nan' in:" + fname)
-            noProblem = False
-        if(is_None_vec(data).any()):
-            print("Invalid data 'None' in:" + fname)
-            noProblem = False
-    if(noProblem):
-        print('There are no problems in recordings')
-    return noProblem
+def produceDataPoint(timingInfo, nbefore, nafter):
+    """ produceDataPoint:
+    Produce the datapoint from the tuples
+    Input:
+    timingInfo: tuple that contains the file name, location and type of sound
+    size: Size of the data
+    Output:
+    A 2-dimensional tuple whose first elements is data and the second is the label
+    """
+    # Extracting the information
+    fname = timingInfo[0]
+    loc = timingInfo[1]
+    category = timingInfo[2]
+    # Creating the data
+    samples = importWavFile(fname)
+    data = getNeighbourhoodFromSample(samples, loc, nbefore, nafter)
+    # Creating the label
+    # S1 = [1,0]
+    # S2 = [0,1]
+    label = np.zeros([2])
+    category = int(category[1])
+    label[category - 1] = 1
+
+    return (data, label)
 
 
 class timingDataset:
     """
     This is an object to manage the data for the timing task
-
     """
 
-    def __init__(self, FNAME, fnamePrefix='../data/', normalise=True):
-        # Importing the meta data
-        self.timingInfo = getTimingInfo(FNAME, fnamePrefix=fnamePrefix)
-        # Counting the data points
-        self.dataset_size = len(self.timingInfo)
-        # And dividing them into train and valid set (with a ration of 80/20
-        self.no_train = int(self.dataset_size * 0.8)
-        self.no_valid = self.dataset_size - self.no_train
-        # I am going to import data as it is needed.
-        # My computer is fairly low on RAM.
-        # On a bigger machine, it might be better to import it all in one go.
-        self.keys_train = self.timingInfo.keys()[:self.no_train]
-        self.keys_valid = self.timingInfo.keys()[self.no_train:]
-        # We need to have the max_length for we construct the tensors
-        self.max_length = findMaxLength(self.timingInfo.keys())
-        # Testing the soundFiles
-        if(not testSoundFiles(self.timingInfo.keys())):
-            raise ValueError("Invalid values for the recordings")
-        # The user can choose the size of the data they want.
-        # To keep track of which data to return we have two cursors
-        # The first one keep track of which sample we are using
-        # The second keeps track of where we are in the sample
-        self.index_train = 0
-        self.index_sample_train = 0
-        self.current_data_train = None
-        self.current_label_train = None
+    def __init__(self, fname, prefix, nbefore, nafter, seed=None):
+        # Saving the parameters for the constructor
+        self.fname = fname
+        self.prefix = prefix
+        self.nbefore = nbefore
+        self.nafter = nafter
+        self.size = nbefore + nafter
+        # Get the timingInfo
+        self.timingInfo = getTimingInfo(self.fname, self.prefix)
+        # Get some metadata on the timingInfo
+        self.set_size = len(self.timingInfo)
+        self.distinct_recordings = list(set(map(
+            lambda x: x[0],
+            self.timingInfo)))
+        # Seperating the data into training and validation subsets
+        cuttoff_index = int(self.set_size * 0.8)
 
-        # Naturally we have a second set for validation
+        index = np.arange(self.set_size)
+        if seed is not None:
+            np.random.seed(seed)
+            np.random.shuffle(index)
+
+        self.info_train = [self.timingInfo[i]
+                           for i in index[:cuttoff_index]]
+        self.info_valid = [self.timingInfo[i]
+                           for i in index[cuttoff_index:]]
+
+        self.no_train = len(self.info_train)
+        self.no_valid = len(self.info_valid)
+        # Setting the cursors
+        self.index_train = 0
         self.index_valid = 0
-        self.index_sample_valid = 0
-        self.current_data_valid = None
-        self.current_label_valid = None
 
         self.epochs = 0
-        self.get_new_permutation()
 
-        # Lastly, parameter for pre-treatement of data
-        self.normalise = normalise
+        self.get_new_permutation()
 
     def reset(self):
-        """
-        Reseting the dataset
-        """
         self.index_train = 0
         self.index_valid = 0
+
         self.epochs = 0
-        self.get_new_permutation()
 
     def get_new_permutation(self):
         """
@@ -203,182 +157,57 @@ class timingDataset:
         self.perm = np.arange(self.no_train)
         np.random.shuffle(self.perm)
 
-    def get_new_samples(self, key, label_reduction):
-        # First getting the data
-        data = getSoundData(key)
-        if(self.normalise):
-            div = np.amax(data, axis=1) - np.amin(data, axis=1)
-            data = data / div
-        length = data.shape[1]
-        # Then the labels
-        locationsByType = self.timingInfo[key]
-        soundTypes = locationsByType.keys()
-        label = np.zeros([1, length / label_reduction, len(soundTypes)],
-                         dtype=np.float32)
-        i = 0
-        for t in soundTypes:
-            locations = locationsByType[t]
-            for l in locations:
-                label[0, l / label_reduction, i] = 1
-            i = i + 1
+    def next_batch_train(self, batch_size=1):
+        """
+        Gives the next batch in the training subset
+        """
 
+        start = self.index_train
+        self.index_train += batch_size
+        # If the index exceeds the the subset size,
+        # we reset the index and get a new permutation.
+        if(self.index_train > self.no_train):
+            self.epochs += 1
+            start = 0
+            self.index_train = batch_size
+            self.get_new_permutation()
+        end = self.index_train
+        # Extract from the permutation the indexes we need
+        curr_perm = self.perm[start:end]
+        # Get the information we need
+        info = [self.info_train[i] for i in curr_perm]
+        # We iteratively produce the data points and store them in np arrays
+        data = np.zeros(shape=[batch_size, self.size])
+        label = np.zeros(shape=[batch_size, 2])
+        n = 0
+        for i in info:
+            d, l = produceDataPoint(i, self.nbefore, self.nafter)
+            data[n, :] = d
+            label[n, :] = l
+            n += 1
         return (data, label)
 
-    def next_batch_train(self,
-                         batch_size=1,
-                         data_length=10**5,
-                         step_size=10**3,
-                         label_reduction=1):
+    def next_batch_valid(self, batch_size=1):
         """
-        Get the batch for the training
-        batch_size is the number of elements we want
+        Gives the next batch in the valid subset
         """
-        data = np.zeros([batch_size, data_length, 1],
-                        dtype=np.float32)
-        labels = np.zeros([batch_size, data_length / label_reduction, 2],
-                          dtype=np.float32)
-
-        b = 0
-        ready = True
-        while(b < batch_size):
-            # If we are at the end of the current epoch
-            if(self.index_train >= self.no_train):
-                # Emptying the current samples
-                self.current_data_train = None
-                self.current_label_train = None
-                # Resetting the indicators and incrementing the epoch counter
-                self.index_train = 0
-                self.index_sample_train = 0
-                self.get_new_permutation()
-                self.epochs += 1
-            # If the samples are not imported yet, we need to import them
-            if self.current_data_train is None:
-                # Getting the key to get the samples
-                key = self.perm[self.index_train]
-                key = self.keys_train[key]
-                # Getting new samples
-                data_train, label_train = self.get_new_samples(
-                    key, label_reduction)
-                self.current_data_train = data_train
-                self.current_label_train = label_train
-
-            # Setting the limits
-            start = self.index_sample_train
-            end = start + data_length
-            # If the expected data length is greater than the sample,
-            # we will use the whole sample and then zero pad
-            if(data_length > self.current_data_train.shape[1]):
-                end = self.current_data_train.shape[1]
-            ready = True
-            # We are at the end of the current samples
-            if (end > self.current_data_train.shape[1]):
-                # Incrementing and resetting the indexes
-                self.index_train += 1
-                self.index_sample_train = 0
-                # Emptying the samples
-                self.current_data_train = None
-                self.current_label_train = None
-                ready = False
-            # When we are ready, we get the data
-            if(ready):
-                data[b, 0:(end - start), :] = self.current_data_train[
-                    0, start: end, :]
-                start = start / label_reduction
-                end = end / label_reduction
-                labels[b, 0:(end - start), :] = self.current_label_train[
-                    0, start:end, :]
-                # If data length is longer than the sample,
-                # we move on to the next sample
-                if(data_length > self.current_data_train.shape[1]):
-                    # Incrementing and resetting the indexes
-                    self.index_train += 1
-                    self.index_sample_train = 0
-                    # Emptying the samples
-                    self.current_data_train = None
-                    self.current_label_train = None
-                # If not, we incrementing the cursor in the sample
-                else:
-                    self.index_sample_train += step_size
-                b += 1
-
-        return(data, labels)
-
-    def next_batch_valid(self,
-                         batch_size=1,
-                         data_length=10**5,
-                         step_size=10 ** 3,
-                         label_reduction=1):
-        """
-        Get the batch for the training
-        batch_size is the number of elements we want
-        diff_n is the lag we want for the differentiation
-        """
-        data = np.zeros([batch_size, data_length, 1],
-                        dtype=np.float32)
-        labels = np.zeros([batch_size, data_length / label_reduction, 2],
-                          dtype=np.float32)
-
-        b = 0
-        ready = True
-        while(b < batch_size):
-            # If we are at the end of the current epoch
-            if(self.index_valid >= self.no_valid):
-                # Emptying the current samples
-                self.current_data_train = None
-                self.current_label_valid = None
-                # Resetting the indicators and incrementing the epoch counter
-                self.index_valid = 0
-                self.index_sample_valid = 0
-
-                return(-1, -1, -1)
-            # If the samples are not imported yet, we need to import them
-            if self.current_data_valid is None:
-                # Getting the key to get the samples
-                key = self.index_valid
-                key = self.keys_valid[key]
-                # Getting new samples
-                data_valid, label_valid = self.get_new_samples(
-                    key, label_reduction)
-                self.current_data_valid = data_valid
-                self.current_label_valid = label_valid
-
-            # Setting the limits
-            start = self.index_sample_valid
-            end = start + data_length
-            # If the expected data length is greater than the sample,
-            # we will use the whole sample and then zero pad
-            if(data_length > self.current_data_valid.shape[1]):
-                end = self.current_data_valid.shape[1]
-            ready = True
-            # We are at the end of the current samples
-            if (end > self.current_data_valid.shape[1]):
-                # Incrementing and resetting the indexes
-                self.index_valid += 1
-                self.index_sample_valid = 0
-                # Emptying the samples
-                self.current_data_valid = None
-                self.current_label_valid = None
-                ready = False
-            # When we are ready, we get the data
-            if(ready):
-                data[b, :(end - start), 0] = self.current_data_valid[
-                    0, start: end, 0]
-                start = start / label_reduction
-                end = end / label_reduction
-                labels[b, :(end - start), :] = self.current_label_valid[
-                    0, start: end, :]
-                # If data length is longer than the sample,
-                # we move on to the next sample
-                if(data_length > self.current_data_valid.shape[1]):
-                    # Incrementing and resetting the indexes
-                    self.index_valid += 1
-                    self.index_sample_valid = 0
-                    # Emptying the samples
-                    self.current_data_valid = None
-                    self.current_label_valid = None
-                # If not, we incrementing the cursor in the sample
-                else:
-                    self.index_sample_valid += step_size
-                b += 1
-
-        return(data, labels, 1)
+        start = self.index_valid
+        self.index_valid += batch_size
+        # If the index exceeds the the subset size,
+        # we reset the index and return (None,None)
+        if(self.index_valid > self.no_valid):
+            self.index_valid = 0
+            return (None, None)
+        end = self.index_valid
+        # Get the information we need
+        info = self.info_valid[start:end]
+        # We iteratively produce the data points and store them in np arrays
+        data = np.zeros(shape=[batch_size, self.size])
+        label = np.zeros(shape=[batch_size, 2])
+        n = 0
+        for i in info:
+            d, l = produceDataPoint(i, self.nbefore, self.nafter)
+            data[n, :] = d
+            label[n, :] = l
+            n += 1
+        return (data, label)
