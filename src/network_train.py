@@ -1,20 +1,23 @@
 #!/usr/bin/env python
 
-# The implementation here is greatly inspired by this example:
-# https://github.com/aymericdamien/TensorFlow-Examples/blob/master/examples/3_NeuralNetworks/recurrent_network.py
-
 import tensorflow as tf
 
 import logger
 
 
 from timingDataset import timingDataset
+from preprocessing import stft_sig2image, normalize
 
 # Creating the dataset
-dataset = timingDataset("../data/set_a_timing.csv")
+dataset = timingDataset(fname="../data/set_a_timing.csv",
+                        prefix="../data",
+                        nbefore=2**10,
+                        nafter=2**10,
+                        seed=1234)
 
 # Creating the logger object
-fields = ["train_step", "epoch", "batch", "train_loss", "valid_loss"]
+fields = ["train_step", "epoch", "batch", "train_loss",
+          "valid_loss", "train_accuracy", "valid_accuracy"]
 logFname = "../logs/" + logger.getLogName()
 log = logger.LogWriter(logFname, fields)
 
@@ -24,43 +27,40 @@ log = logger.LogWriter(logFname, fields)
 # The number of conv+max_pool layers we will have
 n_layers = 7
 # The number of filter for each convolutional layer
-n_filters = [8, 8, 8, 8, 8, 4, 2]
-kernel_size = [2**(n_layers - n) for n in range(n_layers)]
+n_filters = [8, 8, 4, 4, 2, 2, 1]
+kernel_size = [32, 32, 16, 16, 8, 8, 4]
 # The Learning rate for the optimizer
 learning_rate = 0.01
-# The length of the data
-data_length = 2**13
-step_size = 2**11
 
 # Some variables to control the training
 LOG_STEP = 10
 SAVER_STEP = 10
 training_steps = 10**4
-batch_size = 1
+batch_size = 10
+
+# Parameters for the preprocessing
+nperseg = 8
+nfft = 512
 
 # Creating the network:
 
 # The Input
 x = tf.placeholder(tf.float32,
-                   [batch_size, data_length, 1],
+                   [None, 257, 513, 1],
                    name="x")
 # The label/target
 y_ = tf.placeholder(tf.float32,
-                    [batch_size, data_length / (2**n_layers), 2],
+                    [None, 2],
                     name="y_")
 
-# Reshaping the arguments
-xr = tf.reshape(x, shape=[batch_size, data_length, 1, 1])
-yr_ = tf.reshape(y_, shape=[batch_size, data_length / (2**n_layers), 1, 2])
-
-conv_out = xr
+conv_out = x
 
 # The convolution + pooling layers
 for i in range(n_layers):
     h_conv = tf.layers.conv2d(
         inputs=conv_out,
         filters=n_filters[i],
-        kernel_size=[kernel_size[i], 1],
+        kernel_size=[kernel_size[i], kernel_size[i]],
         padding="same",
         activation=tf.nn.relu,
         kernel_initializer=tf.truncated_normal_initializer(),
@@ -68,19 +68,24 @@ for i in range(n_layers):
 
     h_pool = tf.layers.max_pooling2d(
         inputs=h_conv,
-        pool_size=[2, 1],
+        pool_size=[2, 2],
         strides=2,
         name=("pool_%d" % i))
     conv_out = h_pool
+# Passing the results through a dense layer
+h_flat = tf.contrib.layers.flatten(conv_out)
+h_dense = tf.layers.dense(h_flat, units=2, activation=tf.nn.relu)
 
-# Training operations
-y = tf.sigmoid(conv_out, name="y")
-
+y = tf.nn.softmax(h_dense)
 # Calculating the loss
-cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
-    logits=conv_out,
-    labels=yr_)
-loss = tf.reduce_sum(cross_entropy)
+cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
+    logits=h_dense,
+    labels=y_)
+loss = tf.reduce_mean(cross_entropy)
+# We are also interested in the accuracy
+correct_pred = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
+accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float64))
+
 # I am using Adam as it has built-in learning rate reduction.
 # The moments also help speed up the learning.
 # Plus I am lazy.
@@ -94,19 +99,22 @@ init = tf.global_variables_initializer()
 saver = tf.train.Saver()
 checkpoint = 0
 
+
 with tf.Session() as sess:
     sess.run(init)
 
     for s in range(training_steps + 1):
         print("step %d" % s)
+        # Getting the next batch
         train_data, train_label = dataset.next_batch_train(
-            batch_size,
-            data_length=data_length,
-            step_size=step_size,
-            label_reduction=2**n_layers)
-
+            batch_size)
+        # Preprocessing
+        train_data = normalize(train_data)
+        train_data = stft_sig2image(train_data,
+                                    nperseg=nperseg,
+                                    nfft=nfft)
+        # A training step
         sess.run(train_op, feed_dict={x: train_data, y_: train_label})
-
         if(s % LOG_STEP == 0):
             log_entry = {}
             log_entry["train_step"] = s
@@ -114,24 +122,38 @@ with tf.Session() as sess:
             log_entry["batch"] = dataset.index_train
             log_entry["train_loss"] = sess.run(
                 loss,
-                feed_dict={x: train_data, y_: train_label})
-            valid_loss = 0
-            no_valid = 0
+                feed_dict={x: train_data,
+                           y_: train_label})
+            log_entry["train_accuracy"] = sess.run(
+                accuracy,
+                feed_dict={x: train_data,
+                           y_: train_label})
+            # A list to record the loss for the validation set
+            valid_losses = []
+            valid_accuracies = []
             while True:
-                valid_data, valid_label, ended = dataset.next_batch_valid(
-                    batch_size,
-                    data_length=data_length,
-                    step_size=step_size,
-                    label_reduction=2**n_layers)
-
-                if ended == -1:
+                valid_data, valid_label = dataset.next_batch_valid(
+                    batch_size)
+                if valid_data is None:
                     break
-                valid_loss += sess.run(
+                # Preprocessing
+                valid_data = normalize(valid_data)
+                valid_data = stft_sig2image(valid_data,
+                                            nperseg=nperseg,
+                                            nfft=nfft)
+                # We first calculate the loss then the accuracy
+                valid_loss = sess.run(
                     loss,
                     feed_dict={x: valid_data, y_: valid_label})
-                no_valid += 1
+                valid_losses.append(valid_loss)
+                valid_accuracy = sess.run(
+                    accuracy,
+                    feed_dict={x: valid_data, y_: valid_label})
+                valid_accuracies.append(valid_accuracy)
 
-            log_entry["valid_loss"] = valid_loss / no_valid
+            log_entry["valid_loss"] = sum(valid_losses) / len(valid_losses)
+            log_entry["valid_accuracy"] = sum(
+                valid_accuracies) / len(valid_accuracies)
             log.addEntry(log_entry)
             print(log_entry)
 
