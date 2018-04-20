@@ -1,71 +1,38 @@
 import numpy as np
-import tensorflow as tf
-
+import scipy.signal as signal
 import matplotlib.pyplot as plt
 
 from timingDataset import timingDataset
-
+from preprocessing import stft_sig2image, normalize
 
 # Getting the dataset
-dataset = timingDataset("../data/set_a_timing.csv", normalise=False)
+dataset = timingDataset(fname="../data/set_a_timing.csv",
+                        prefix="../data",
+                        nbefore=2**10,
+                        nafter=2**10,
+                        seed=1234)
 
-# Some variables
 
-num_hidden = 16
-learning_rate = 10**-6
-batch_size = 1
-
-diff_n = 0
-# Getting one samples
-data, label = dataset.next_batch_train(
-    batch_size=1,
-    data_length=2**13,
-    step_size=2**11,
-    label_reduction=2**3)
-
-# Transforming the data
-
+# Getting a test batch
+N = 2
+data, label = dataset.next_batch_train(N)
+data = normalize(data)
+SXX = stft_sig2image(data, nperseg=8, nfft=512)
 t = range(data.shape[1])
-s1_loc = 2 * np.where(label[0, :, 0] == 1)[0]
-s2_loc = 2 * np.where(label[0, :, 1] == 1)[0]
+print(label)
+# Plotting the signal
+fig, axes = plt.subplots(N, 2)
 
-# Plotting
-ax = plt.subplot(2, 1, 1)
-ax.plot(t, data[0, :, 0], 'black')
-ax.grid()
+for n in range(N):
+    ax1 = axes[n, 0]
+    ax2 = axes[n, 1]
 
-plt.show()
+    t = range(data.shape[1])
+    lines = ax1.plot(t, data[n, :], 'black')
+    ax1.grid()
 
-# We are also going to feed the data into a network and check the result
-with tf.Session() as sess:
-    saver = tf.train.import_meta_graph('../checkpoints/checkpoint-0.meta')
-    saver.restore(sess, tf.train.latest_checkpoint('../checkpoints'))
-
-    graph = tf.get_default_graph()
-    x = graph.get_tensor_by_name("x:0")
-    y_ = graph.get_tensor_by_name("y_:0")
-    y = graph.get_tensor_by_name("y:0")
-
-    net_out = sess.run(y, feed_dict={x: data})
-
-
-print(net_out.shape)
-print(label.shape)
-
-# Plotting the output
-ax = plt.subplot(2, 2, 1)
-t = range(net_out.shape[1])
-ax.plot(t, net_out[0, :, 0, 0], color="red")
-
-
-ax = plt.subplot(2, 2, 2)
-ax.plot(t, label[0, :, 0], color="red")
-
-
-ax = plt.subplot(2, 2, 3)
-ax.plot(t, net_out[0, :, 0, 1], color="blue")
-
-ax = plt.subplot(2, 2, 4)
-ax.plot(t, label[0, :, 1], color="blue")
+    # Plotting the STFT of the signal
+    im = ax2.pcolormesh(SXX[n, :, :, 0])
+    fig.colorbar(im, ax=ax2)
 
 plt.show()
