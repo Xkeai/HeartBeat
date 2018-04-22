@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 import tensorflow as tf
-
+import numpy as np
+import scipy.signal as signal
 import logger
 
 
 from timingDataset import timingDataset
-from preprocessing import stft_sig2image, normalize
 
 # Creating the dataset
 dataset = timingDataset(fname="../data/set_a_timing.csv",
@@ -27,7 +27,7 @@ log = logger.LogWriter(logFname, fields)
 # The number of conv+max_pool layers we will have
 n_layers = 7
 # The number of filter for each convolutional layer
-n_filters = [8, 8, 4, 4, 2, 2, 1]
+n_filters = [4, 4, 2, 2, 2, 1, 1]
 kernel_size = [32, 32, 16, 16, 8, 8, 4]
 # The Learning rate for the optimizer
 learning_rate = 0.01
@@ -36,17 +36,35 @@ learning_rate = 0.01
 LOG_STEP = 10
 SAVER_STEP = 10
 training_steps = 10**4
-batch_size = 10
+batch_size = 5
 
 # Parameters for the preprocessing
-nperseg = 8
-nfft = 512
+nperseg = 2**9
+noverlap = nperseg - 1
+
+
+def preprocess(data):
+    # Transforming the sound signal into an image
+    t, f, SXX = signal.stft(data,
+                            nperseg=nperseg,
+                            noverlap=noverlap,
+                            axis=1)
+    # Feature scaling the image
+    # Method used: Standi
+    SXX = np.abs(SXX)
+    mu = np.mean(SXX, axis=(1, 2))
+    sigma = np.std(SXX, axis=(1, 2))
+    for n in range(data.shape[0]):
+        SXX[n, :, :] = (SXX[n, :, :] - mu[n]) / sigma[n]
+    SXX = SXX[:, :, :, np.newaxis]
+    return SXX
+
 
 # Creating the network:
 
 # The Input
 x = tf.placeholder(tf.float32,
-                   [None, 257, 513, 1],
+                   [None, 257, 2049, 1],
                    name="x")
 # The label/target
 y_ = tf.placeholder(tf.float32,
@@ -109,10 +127,7 @@ with tf.Session() as sess:
         train_data, train_label = dataset.next_batch_train(
             batch_size)
         # Preprocessing
-        train_data = normalize(train_data)
-        train_data = stft_sig2image(train_data,
-                                    nperseg=nperseg,
-                                    nfft=nfft)
+        train_data = preprocess(train_data)
         # A training step
         sess.run(train_op, feed_dict={x: train_data, y_: train_label})
         if(s % LOG_STEP == 0):
@@ -137,10 +152,7 @@ with tf.Session() as sess:
                 if valid_data is None:
                     break
                 # Preprocessing
-                valid_data = normalize(valid_data)
-                valid_data = stft_sig2image(valid_data,
-                                            nperseg=nperseg,
-                                            nfft=nfft)
+                valid_data = preprocess(valid_data)
                 # We first calculate the loss then the accuracy
                 valid_loss = sess.run(
                     loss,
