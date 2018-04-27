@@ -5,15 +5,10 @@ import numpy as np
 import scipy.signal as signal
 import logger
 
-
-from timingDataset import timingDataset
+from classificationDataset import classificationDataset
 
 # Creating the dataset
-dataset = timingDataset(fname="../data/set_a_timing.csv",
-                        prefix="../data",
-                        nbefore=2**10,
-                        nafter=2**10,
-                        seed=1234)
+dataset = classificationDataset("../data/set_b.csv", "../data/", seed=123)
 
 # Creating the logger object
 fields = ["train_step", "epoch", "batch", "train_loss",
@@ -35,22 +30,16 @@ learning_rate = 0.01
 # Some variables to control the training
 LOG_STEP = 10
 SAVER_STEP = 10
-training_steps = 10**4
+training_steps = 10**5
 batch_size = 5
-
-# Parameters for the preprocessing
-nperseg = 2**9
-noverlap = nperseg - 1
 
 
 def preprocess(data):
     # Transforming the sound signal into an image
     t, f, SXX = signal.stft(data,
-                            nperseg=nperseg,
-                            noverlap=noverlap,
                             axis=1)
     # Feature scaling the image
-    # Method used: Standi
+    # Method used: Standardization
     SXX = np.abs(SXX)
     mu = np.mean(SXX, axis=(1, 2))
     sigma = np.std(SXX, axis=(1, 2))
@@ -64,11 +53,11 @@ def preprocess(data):
 
 # The Input
 x = tf.placeholder(tf.float32,
-                   [None, 257, 2049, 1],
+                   [None, 129, 872, 1],
                    name="x")
 # The label/target
 y_ = tf.placeholder(tf.float32,
-                    [None, 2],
+                    [None, 3],
                     name="y_")
 
 conv_out = x
@@ -92,7 +81,7 @@ for i in range(n_layers):
     conv_out = h_pool
 # Passing the results through a dense layer
 h_flat = tf.contrib.layers.flatten(conv_out)
-h_dense = tf.layers.dense(h_flat, units=2, activation=tf.nn.relu)
+h_dense = tf.layers.dense(h_flat, units=3, activation=tf.nn.relu)
 
 y = tf.nn.softmax(h_dense)
 # Calculating the loss
@@ -174,3 +163,4 @@ with tf.Session() as sess:
                               "../checkpoints/checkpoint",
                               global_step=checkpoint)
             print("Saved checkpoint to %s" % (path))
+            checkpoint += 1
