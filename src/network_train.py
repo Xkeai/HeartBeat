@@ -5,15 +5,24 @@ import numpy as np
 import scipy.signal as signal
 import logger
 
+import os
 from classificationDataset import classificationDataset
 
 # Creating the dataset
 dataset = classificationDataset("../data/set_b.csv", "../data/", seed=123)
 
+# Creating the folder for training session
+sessionPath = "../sessions/" + logger.getSessionPath()
+os.mkdir(sessionPath)
+logPath = sessionPath
+checkpointPath = sessionPath + "checkpoints/"
+os.mkdir(checkpointPath)
+
 # Creating the logger object
+
 fields = ["train_step", "epoch", "batch", "train_loss",
           "valid_loss", "train_accuracy", "valid_accuracy"]
-logFname = "../logs/" + logger.getLogName()
+logFname = logPath + logger.getLogName()
 log = logger.LogWriter(logFname, fields)
 
 # Defining some general variables to be used in the graph
@@ -160,7 +169,7 @@ with tf.Session() as sess:
 
         if(s % SAVER_STEP == 0):
             path = saver.save(sess,
-                              "../checkpoints/checkpoint",
+                              checkpointPath + "checkpoint",
                               global_step=checkpoint)
             print("Saved checkpoint to %s" % (path))
             checkpoint += 1

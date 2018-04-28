@@ -2,6 +2,10 @@ from time import gmtime, strftime
 import csv
 
 
+def getSessionPath():
+    return "session_" + strftime("%y%m%d_%H%M", gmtime()) + "/"
+
+
 def getLogName():
     return "log_" + strftime("%y%m%d_%H%M", gmtime()) + ".csv"
 
