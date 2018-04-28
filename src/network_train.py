@@ -52,6 +52,10 @@ def preprocess(data):
     SXX = np.abs(SXX)
     mu = np.mean(SXX, axis=(1, 2))
     sigma = np.std(SXX, axis=(1, 2))
+    if np.any(sigma == 0):
+        print "sigma is zero"
+    if np.any(np.isnan(sigma)):
+        print "sigma is nan"
     for n in range(data.shape[0]):
         SXX[n, :, :] = (SXX[n, :, :] - mu[n]) / sigma[n]
     SXX = SXX[:, :, :, np.newaxis]
