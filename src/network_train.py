@@ -23,7 +23,7 @@ log = logger.LogWriter(logFname, fields)
 n_layers = 7
 # The number of filter for each convolutional layer
 n_filters = [4, 4, 2, 2, 2, 1, 1]
-kernel_size = [32, 32, 16, 16, 8, 8, 4]
+# kernel_size = [2, 2, 2, 2, , 8, 4]
 # The Learning rate for the optimizer
 learning_rate = 0.01
 
@@ -31,7 +31,7 @@ learning_rate = 0.01
 LOG_STEP = 10
 SAVER_STEP = 10
 training_steps = 10**5
-batch_size = 5
+batch_size = 10
 
 
 def preprocess(data):
@@ -67,7 +67,7 @@ for i in range(n_layers):
     h_conv = tf.layers.conv2d(
         inputs=conv_out,
         filters=n_filters[i],
-        kernel_size=[kernel_size[i], kernel_size[i]],
+        kernel_size=[2, 2],
         padding="same",
         activation=tf.nn.relu,
         kernel_initializer=tf.truncated_normal_initializer(),
