@@ -31,8 +31,9 @@ log = logger.LogWriter(logFname, fields)
 # The number of conv+max_pool layers we will have
 n_layers = 7
 # The number of filter for each convolutional layer
-n_filters = [4, 4, 2, 2, 2, 1, 1]
-# kernel_size = [2, 2, 2, 2, , 8, 4]
+n_filters = [2, 2, 2, 2, 2, 1, 1]
+kernel_size = [32, 16, 8, 4, 2, 2, 2]
+kernel_size = [[i, i] for i in kernel_size]
 # The Learning rate for the optimizer
 learning_rate = 0.01
 
@@ -80,17 +81,18 @@ for i in range(n_layers):
     h_conv = tf.layers.conv2d(
         inputs=conv_out,
         filters=n_filters[i],
-        kernel_size=[2, 2],
-        padding="same",
+        kernel_size=kernel_size[i],
+        padding="SAME",
         activation=tf.nn.relu,
         kernel_initializer=tf.truncated_normal_initializer(),
         name=("conv_%d" % i))
 
     h_pool = tf.layers.max_pooling2d(
         inputs=h_conv,
-        pool_size=[2, 2],
-        strides=2,
-        name=("pool_%d" % i))
+        pool_size=kernel_size[i],
+        strides=(2, 2),
+        name=("pool_%d" % i),
+        padding="SAME")
     conv_out = h_pool
 # Passing the results through a dense layer
 h_flat = tf.contrib.layers.flatten(conv_out)

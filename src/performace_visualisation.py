@@ -2,22 +2,36 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # Importing the log
-perf_log = pd.read_csv("../logs/log_180419_1358.csv")
+perf_log = pd.read_csv("../sessions/session_180428_2242/log_180428_2242.csv")
 
 
 # Building the graph
-fig, ax = plt.subplots()
+fig, (ax1, ax2) = plt.subplots(1, 2)
 
-ax.plot(perf_log["train_step"],
-        perf_log["train_loss"],
-        label="Training Loss")
+# The graph for the loss
+ax1.plot(perf_log["train_step"],
+         perf_log["train_loss"],
+         label="Training Loss")
 
-ax.plot(perf_log["train_step"],
-        perf_log["valid_loss"],
-        label="Validation Loss")
+ax1.plot(perf_log["train_step"],
+         perf_log["valid_loss"],
+         label="Validation Loss")
 
 plt.legend()
-ax.grid()
-ax.set(xlabel="Time steps", ylabel="Loss")
+ax1.grid()
+ax1.set(xlabel="Time steps", ylabel="Loss")
+
+# The graph for the accuracy
+ax2.plot(perf_log["train_step"],
+         perf_log["train_accuracy"],
+         label="Training Accuracy")
+
+ax2.plot(perf_log["train_step"],
+         perf_log["valid_accuracy"],
+         label="Validation Accuracy")
+
+plt.legend()
+ax2.grid()
+ax2.set(xlabel="Time steps", ylabel="Accuracy")
 
 plt.show()
