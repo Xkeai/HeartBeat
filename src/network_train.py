@@ -40,7 +40,7 @@ learning_rate = 0.01
 # Some variables to control the training
 LOG_STEP = 10
 SAVER_STEP = 10
-training_steps = 10**5
+training_steps = 5 * 10**5
 batch_size = 10
 
 

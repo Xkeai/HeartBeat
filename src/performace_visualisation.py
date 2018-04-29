@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # Importing the log
-perf_log = pd.read_csv("../sessions/session_180428_2242/log_180428_2242.csv")
+perf_log = pd.read_csv("../sessions/session_180429_1026/log_180429_1026.csv")
 
 
 # Building the graph
