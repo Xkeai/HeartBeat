@@ -31,7 +31,7 @@ log = logger.LogWriter(logFname, fields)
 # The number of conv+max_pool layers we will have
 n_layers = 7
 # The number of filter for each convolutional layer
-n_filters = [2, 2, 2, 2, 2, 1, 1]
+n_filters = [4, 8, 8, 8, 4, 2, 1]
 kernel_size = [32, 16, 8, 4, 2, 2, 2]
 kernel_size = [[i, i] for i in kernel_size]
 # The Learning rate for the optimizer
