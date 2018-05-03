@@ -43,6 +43,10 @@ SAVER_STEP = 10
 training_steps = 5 * 10**5
 batch_size = 10
 
+# Parameters of preprocessing
+nperseg = 2**10
+noverlap = 2**10 - 2**7
+
 
 def preprocess(data):
     # Transforming the sound signal into an image
@@ -67,7 +71,7 @@ def preprocess(data):
 
 # The Input
 x = tf.placeholder(tf.float32,
-                   [None, 129, 872, 1],
+                   [None, 513, 872, 1],
                    name="x")
 # The label/target
 y_ = tf.placeholder(tf.float32,

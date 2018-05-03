@@ -52,7 +52,8 @@ for i in range(n_cat):
     ax1.set(title="Example of a %s" % (label))
 
     #
-    t, f, Zxx = signal.stft(sample, nperseg=2**8)
+    t, f, Zxx = signal.stft(sample, nperseg=2**10, noverlap=2**10 - 2**7)
     Zxx = np.abs(Zxx)
-    ax2.pcolormesh(Zxx)
-    plt.show()
+    ax2.pcolormesh(f, t, Zxx)
+
+plt.show()

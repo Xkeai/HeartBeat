@@ -10,4 +10,5 @@ dataset = classificationDataset("../data/set_b.csv", "../data/", seed=123)
 N = 2
 data, label = dataset.next_batch_valid()
 
-for n in range():
+t, f, Zxx = signal.stft(data, nperseg=2**10, noverlap=2**10 - 2**7)
+print(Zxx.shape)
