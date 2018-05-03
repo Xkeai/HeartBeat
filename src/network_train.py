@@ -51,7 +51,9 @@ noverlap = 2**10 - 2**7
 def preprocess(data):
     # Transforming the sound signal into an image
     t, f, SXX = signal.stft(data,
-                            axis=1)
+                            axis=1,
+                            nperseg=nperseg,
+                            noverlap=noverlap)
     # Feature scaling the image
     # Method used: Standardization
     SXX = np.abs(SXX)
