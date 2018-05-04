@@ -105,8 +105,9 @@ h_flat = tf.contrib.layers.flatten(conv_out)
 h_dense = tf.layers.dense(h_flat, units=3, activation=tf.nn.relu)
 # The prediction
 y = tf.nn.softmax(h_dense)
-# Calculating the loss
-loss = tf.losses.mean_squared_error(labels=y_, predictions=y)
+# Calculating the loss (Cross-entropy)
+loss = -tf.reduce_sum(y_ * tf.log(y), 1)
+loss = tf.reduce_mean(loss, 0)
 # We are also interested in the accuracy
 correct_pred = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float64))
