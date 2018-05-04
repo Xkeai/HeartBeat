@@ -12,7 +12,7 @@ from classificationDataset import classificationDataset
 dataset = classificationDataset("../data/set_b.csv", "../data/", seed=123)
 
 # Creating the folder for training session
-sessionPath = "../sessions/test_" + logger.getSessionPath()
+sessionPath = "../sessions/" + logger.getSessionPath()
 os.mkdir(sessionPath)
 logPath = sessionPath
 checkpointPath = sessionPath + "checkpoints/"
