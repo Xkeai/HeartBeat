@@ -12,7 +12,7 @@ from classificationDataset import classificationDataset
 dataset = classificationDataset("../data/set_b.csv", "../data/", seed=123)
 
 # Creating the folder for training session
-sessionPath = "../sessions/" + logger.getSessionPath()
+sessionPath = "../sessions/test_" + logger.getSessionPath()
 os.mkdir(sessionPath)
 logPath = sessionPath
 checkpointPath = sessionPath + "checkpoints/"
@@ -41,7 +41,7 @@ learning_rate = 0.01
 LOG_STEP = 10
 SAVER_STEP = 10
 training_steps = 5 * 10**5
-batch_size = 10
+batch_size = 1
 
 # Parameters of preprocessing
 nperseg = 2**10
@@ -103,10 +103,10 @@ for i in range(n_layers):
 # Passing the results through a dense layer
 h_flat = tf.contrib.layers.flatten(conv_out)
 h_dense = tf.layers.dense(h_flat, units=3, activation=tf.nn.relu)
-
+# The prediction
 y = tf.nn.softmax(h_dense)
 # Calculating the loss
-loss = tf.losses.sparse_softmax_cross_entropy(label=y_, logits=y)
+loss = tf.losses.mean_squared_error(labels=y_, predictions=y)
 # We are also interested in the accuracy
 correct_pred = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float64))
