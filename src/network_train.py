@@ -106,10 +106,7 @@ h_dense = tf.layers.dense(h_flat, units=3, activation=tf.nn.relu)
 
 y = tf.nn.softmax(h_dense)
 # Calculating the loss
-cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
-    logits=h_dense,
-    labels=y_)
-loss = tf.reduce_mean(cross_entropy)
+loss = tf.losses.sparse_softmax_cross_entropy(label=y_, logits=y)
 # We are also interested in the accuracy
 correct_pred = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float64))
