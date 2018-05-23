@@ -102,7 +102,10 @@ for i in range(n_layers):
     conv_out = h_pool
 # Passing the results through a dense layer
 h_flat = tf.contrib.layers.flatten(conv_out)
-h_dense = tf.layers.dense(h_flat, units=3, activation=tf.nn.relu)
+h_dense = tf.layers.dense(h_flat,
+                          units=3,
+                          kernel_initializer=tf.truncated_normal_initializer(),
+                          activation=tf.nn.relu)
 # The prediction
 y = tf.nn.softmax(h_dense)
 # Calculating the loss (Cross-entropy)
