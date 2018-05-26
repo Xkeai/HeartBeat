@@ -128,6 +128,20 @@ class classificationDataset:
         data = np.array(data)
         return (data, label)
 
+    def random_train_batch(self, batch_size=1):
+        perm = np.arange(self.no_train)
+        np.random.shuffle(perm)
+        perm = perm[:batch_size]
+        # Extract the relevant rows
+        df = self.train_set.iloc[perm]
+        # Creating the label
+        label = map(lambda x: 1 * (x == self.labels), df.label)
+        label = np.array(label)
+        # Creating the data
+        data = map(lambda x: importWavFile(x, self.max_length), df.fname)
+        data = np.array(data)
+        return (data, label)
+
     def next_batch_valid(self, batch_size=1):
         start = self.index_valid
         self.index_valid += batch_size

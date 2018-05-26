@@ -144,17 +144,36 @@ with tf.Session() as sess:
         sess.run(train_op, feed_dict={x: train_data, y_: train_label})
         if(s % LOG_STEP == 0):
             log_entry = {}
+            # General information for the entry
             log_entry["train_step"] = s
             log_entry["epoch"] = dataset.epochs
             log_entry["batch"] = dataset.index_train
-            log_entry["train_loss"] = sess.run(
-                loss,
-                feed_dict={x: train_data,
-                           y_: train_label})
-            log_entry["train_accuracy"] = sess.run(
-                accuracy,
-                feed_dict={x: train_data,
-                           y_: train_label})
+            # Loss and accuracy for the training set
+            # They are calculated by randomly picking 50 samples from the set
+            train_losses = []
+            train_accuracies = []
+            sample_size = 50
+            rand_bs = 10
+            for i in range(sample_size / rand_bs):
+                # Getting a random batch
+                train_data, train_label = dataset.random_train_batch(rand_bs)
+                # Preprocessing
+                train_data = preprocess(train_data)
+                # Calculating the loss and the accuracy
+                train_loss = sess.run(
+                    loss,
+                    feed_dict={x: train_data,
+                               y_: train_label})
+                train_losses.append(train_loss)
+                train_accuracy = sess.run(
+                    accuracy,
+                    feed_dict={x: train_data,
+                               y_: train_label})
+                train_accuracies.append(train_accuracy)
+
+            log_entry["train_loss"] = sum(train_losses) / len(train_losses)
+            log_entry["train_accuracy"] = sum(
+                train_accuracies) / len(train_accuracies)
             # A list to record the loss for the validation set
             valid_losses = []
             valid_accuracies = []
