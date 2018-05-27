@@ -79,6 +79,8 @@ x = tf.placeholder(tf.float32,
 y_ = tf.placeholder(tf.float32,
                     [None, 3],
                     name="y_")
+# The drop rate for the dropout layer
+dropout_prob = tf.placeholder_with_default(1.0, shape=())
 
 conv_out = x
 
@@ -106,12 +108,13 @@ h_dense = tf.layers.dense(h_flat,
                           units=3,
                           kernel_initializer=tf.truncated_normal_initializer(),
                           activation=tf.nn.relu)
+h_dropout = tf.nn.dropout(h_dense, keep_prob=dropout_prob)
 # The prediction
-y = tf.nn.softmax(h_dense)
+y = tf.nn.softmax(h_dropout)
 # Calculating the loss (Cross-entropy)
 loss = tf.reduce_mean(
     tf.nn.softmax_cross_entropy_with_logits_v2(
-        labels=y_, logits=h_dense))
+        labels=y_, logits=h_dropout))
 # We are also interested in the accuracy
 correct_pred = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float64))
@@ -141,7 +144,8 @@ with tf.Session() as sess:
         # Preprocessing
         train_data = preprocess(train_data)
         # A training step
-        sess.run(train_op, feed_dict={x: train_data, y_: train_label})
+        sess.run(train_op, feed_dict={
+                 x: train_data, y_: train_label, dropout_prob: 0.5})
         if(s % LOG_STEP == 0):
             log_entry = {}
             # General information for the entry
